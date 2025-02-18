@@ -2,7 +2,7 @@
 
 ## Running trajectories
 ```@docs
-run_trajectories(sys::System, params::SimulParameters; progbar::Bool = true,
+run_trajectories_gillipsie(sys::System, params::SimulParameters; progbar::Bool = true,
                           psireset::VecOrMat{ComplexF64}=zeros(ComplexF64, 0))
 ```
 
@@ -89,12 +89,12 @@ BackAction.postjumpupdate!(L::Matrix{ComplexF64}, psi::Matrix{ComplexF64}; norma
 
 ### Trajectory Evaluation
 ```@docs
-BackAction.run_singletrajectory(sys::System, params::SimulParameters, W::Vector{Float64}, P::Vector{Float64}, ts::Vector{Float64}, Qs::Array{ComplexF64}, Vs::Array{ComplexF64}; seed::Int64 = 1, isrenewal=false)
+BackAction.run_singletrajectory_gillipsie(sys::System, params::SimulParameters, W::Vector{Float64}, P::Vector{Float64}, ts::Vector{Float64}, Qs::Array{ComplexF64}, Vs::Array{ComplexF64}; seed::Int64 = 1, isrenewal=false)
 ```
 
 
 ```@docs
-BackAction.run_singletrajectory_renewal(sys::System, params::SimulParameters, W::Vector{Float64}, W0::Vector{Float64}, P::Vector{Float64}, ts::Vector{Float64},Qs::Array{ComplexF64}, Vs::Array{ComplexF64}, psireset::VecOrMat{ComplexF64}; seed::Int64 = 1)
+BackAction.run_singletrajectory_gillipsie_renewal(sys::System, params::SimulParameters, W::Vector{Float64}, W0::Vector{Float64}, P::Vector{Float64}, ts::Vector{Float64},Qs::Array{ComplexF64}, Vs::Array{ComplexF64}, psireset::VecOrMat{ComplexF64}; seed::Int64 = 1)
 ```
 
 

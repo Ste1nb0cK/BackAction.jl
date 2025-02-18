@@ -59,7 +59,7 @@
     H_parametrized = (delta::Float64, gamma::Float64) -> (0.5*delta*adjoint(a)*a)::Matrix{ComplexF64}
     L_parametrized = (delta::Float64, gamma::Float64) -> (sqrt(gamma)*a)::Matrix{ComplexF64}
     He_parametrized = BackAction.getheff_parametrized(H_parametrized, [L_parametrized])
-    trajectories = run_trajectories(sys, params)
+    trajectories = run_trajectories_gillipsie(sys, params)
 
     ntimes = 1000
     t_given = collect(LinRange(0, params.tf, ntimes));
@@ -113,7 +113,7 @@ function GetFI(delta::Float64, ntraj::Int64)
                              1e-3 # Tolerance for passing Dark state test
                              )
 
-    trajectories = run_trajectories(sys, params; progbar=false, psireset = params.psi0 );
+    trajectories = run_trajectories_gillipsie(sys, params; progbar=false, psireset = params.psi0 );
     t_given = [tf];
     ntimes = size(t_given)[1]
     xi_sample = Array{ComplexF64}(undef, sys.NLEVELS, sys.NLEVELS, ntimes, params.ntraj)

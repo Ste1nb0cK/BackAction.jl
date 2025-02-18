@@ -1,3 +1,5 @@
+export  System, SimulParameters, DetectionClick, Trajectory
+
 ################# SYSTEM #######################################################
 """
 
@@ -16,6 +18,8 @@ A `struct` that characterizes the dynamics via specification of
 - `Ls::Vector{Matrix{ComplexF64}}`: List of jump operators
 - `J::Matrix{ComplexF64}`: Sum of all the ``L_k^{*}L_k``
 - `Heff::Matrix{ComplexF64}`: Effective Hamiltonian
+- `Cfields::Vector{ComplexF64}`: Coherent fields
+- `T::Matrix{ComplexF64}`: Unitary mixing matrix
 
 # Constructor
 To create an instance it's enough to provide the hamiltonian and the jump operators in a vector.
