@@ -1,5 +1,6 @@
 [deps]
 BackAction = "32f8aca8-888b-4d2f-bb84-700bec69f41d"
+DifferentialEquations = "0c46a032-eb83-5123-abaf-570d42b7fbaa"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 HypothesisTests = "09f84164-cd44-5f33-b23f-e6b0d136a0d5"
 LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
