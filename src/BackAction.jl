@@ -5,13 +5,15 @@ using LinearAlgebra
 using Statistics
 using ProgressMeter
 using Base.Threads
-import Random
+using Random
+using DifferentialEquations
 import StatsBase
 
 # Source files
 include("structs.jl")
 include("functions_jump.jl")
 include("gillipsie.jl")
+include("stepbystep.jl")
 include("run_trajectories.jl")
 include("monitoring.jl")
 # Utilities

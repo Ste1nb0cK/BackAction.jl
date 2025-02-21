@@ -18,8 +18,6 @@ A `struct` that characterizes the dynamics via specification of
 - `Ls::Vector{Matrix{ComplexF64}}`: List of jump operators
 - `J::Matrix{ComplexF64}`: Sum of all the ``L_k^{*}L_k``
 - `Heff::Matrix{ComplexF64}`: Effective Hamiltonian
-- `Cfields::Vector{ComplexF64}`: Coherent fields
-- `T::Matrix{ComplexF64}`: Unitary mixing matrix
 
 # Constructor
 To create an instance it's enough to provide the hamiltonian and the jump operators in a vector.
@@ -34,6 +32,7 @@ struct System
     LLs::Vector{Matrix{ComplexF64}} # List of L^\daggerL
     J::Matrix{ComplexF64} # Sum of Jump operators
     Heff::Matrix{ComplexF64} # Effective Hamiltonian
+
     @doc "
          Inner Constructor of `System` struct.
          # Arguments:
@@ -50,10 +49,39 @@ struct System
             J = J + product
             LLs[k] = product
         end
-        CurvyLs = Vector{Function}(undef, NCHANNELS)
        He = H - 0.5im*J
        new(NLEVELS, NCHANNELS, H, Ls, LLs, J, He)
     end
+    "
+        Constructor that allows specifying the alphas and the T's.
+        The dimension of T must be Nxk, where k=lenght(Ls) but N might be arbitrary.
+        It is expected for T to be unitary
+    "
+    function  System(H::Matrix{ComplexF64}, Ls::Vector{Matrix{ComplexF64}},
+                     T::Matrix{ComplexF64}, alphas::Vector{ComplexF64})
+        NLEVELS = size(H)[1]
+        NCHANNELS = size(T)[1] # Number of jump channels
+        k = length(Ls) # number of original jump operators
+        # To set th
+        J = zeros(ComplexF64, NLEVELS, NLEVELS)
+        # set the Lprimes i.e. the one's we get applying the coherent fields and the superposition
+        Lprimes = [sum(T[i, j] * Ls[j] for j in 1:k) for i in 1:NCHANNELS]
+        # Now add the fields
+        for i in 1:NCHANNELS
+            Lprimes[i] = Lprimes[i] + alphas[i]*I
+        end
+        # finally, set the
+        LLs = Vector{Matrix{ComplexF64}}(undef, NCHANNELS)
+        J = zeros(ComplexF64, NLEVELS, NLEVELS)
+        for k in 1:NCHANNELS
+            product = adjoint(Lprimes[k])*Lprimes[k]
+            J = J + product
+            LLs[k] = product
+        end
+       He = H - 0.5im*J
+       new(NLEVELS, NCHANNELS, H, Lprimes, LLs, J, He)
+    end
+
 end
 Base.show(io::IO, s::System) = print(io,
     "System(NLEVELS=$(s.NLEVELS)\nNCHANNELS=$(s.NCHANNELS)\nH=$(s.H)\nLs=$(s.Ls)\nJ=$(s.J))\nHeff=$(s.Heff))")
