@@ -14,7 +14,7 @@ rf_sys = System(rf_H, # Hamiltonian
 rf_params = SimulParameters(rf_psi0,
     25.0, # Final time. Set very long so that all trajectories jump
     1, # seed
-    3500, # Number of trajectories
+    5500, # Number of trajectories
     75_000, # Number of samples in the finegrid
     3.0, # Multiplier to use in the fine grid
     1e-3 # Tolerance for passing Dark state test
