@@ -64,13 +64,16 @@ struct System
         k = length(Ls) # number of original jump operators
         # To set th
         J = zeros(ComplexF64, NLEVELS, NLEVELS)
-        # set the Lprimes i.e. the one's we get applying the coherent fields and the superposition
+        H_ = copy(H)
+        # unitary mixing
         Lprimes = [sum(T[i, j] * Ls[j] for j in 1:k) for i in 1:NCHANNELS]
-        # Now add the fields
+        # Now add the fields and update the hamiltonian
         for i in 1:NCHANNELS
             Lprimes[i] = Lprimes[i] + alphas[i]*I
+            H_ = H_ - 0.5im*(conj(alphas[i])*Lprimes[i] -alphas[i]*adjoint(Lprimes[i])  )
         end
-        # finally, set the
+
+        #  set the effective hamiltonian
         LLs = Vector{Matrix{ComplexF64}}(undef, NCHANNELS)
         J = zeros(ComplexF64, NLEVELS, NLEVELS)
         for k in 1:NCHANNELS
@@ -78,8 +81,8 @@ struct System
             J = J + product
             LLs[k] = product
         end
-       He = H - 0.5im*J
-       new(NLEVELS, NCHANNELS, H, Lprimes, LLs, J, He)
+        He = H_ - 0.5im*J
+        new(NLEVELS, NCHANNELS, H_, Lprimes, LLs, J, He)
     end
 
 end

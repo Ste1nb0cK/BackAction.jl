@@ -16,7 +16,7 @@ rd_sys = System(rd_H, # Hamiltonian
 rd_params = SimulParameters(rd_psi0,
     3.0, # Final time. Set very long so that all trajectories jump
     1, # seed
-    500, # Number of trajectories
+    100, # Number of trajectories
     50_000, # Number of samples in the finegrid
     10.5, # Multiplier to use in the fine grid
     1e-3 # Tolerance for passing Dark state test
