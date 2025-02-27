@@ -99,7 +99,7 @@ function _create_callback(sys, params, t_eval, rng)
     function condition(u, t, integrator)
         real(dot(u, u)) - _jump_affect!.r[]
     end
-    return ContinuousCallback(condition, _jump_affect!; save_positions=(true, false))
+    return ContinuousCallback(condition, _jump_affect!; save_positions=(false, false))
 end
 
 function _generate_trajectoryproblem_jumps(sys::System, params::SimulParameters, t_eval::AbstractVector; kwargs... )
