@@ -18,7 +18,7 @@ params = SimulParameters(BackAction.rd_psi0,
                              1e-3 # Tolerance for passing Dark state test
                              )
 
-trajectories = run_trajectories(sys, params)
+trajectories = run_trajectories_gillipsie(sys, params)
 
 @testset verbose=true "Radiative Damping: WTD (KS Test and fit)" begin
     rd_times = [trajectories[k][1].time for k in 1:BackAction.rd_params.ntraj if !isempty(trajectories[k])]

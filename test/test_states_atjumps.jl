@@ -28,7 +28,7 @@ end
    ############### Sample some trajectories
     sys = BackAction.rdt_sys
     params = BackAction.rdt_params
-    trajectories = BackAction.run_trajectories(sys, params);
+    trajectories = BackAction.run_trajectories_gillipsie(sys, params);
     ############# For each trajectory, check that the states what what they should be
     for traj in trajectories
         states = BackAction.states_atjumps(traj, sys, params.psi0)
@@ -61,7 +61,7 @@ end
                                 1e-3 # Tolerance for passing Dark state test
                                 )
     ################### Check the correct states are obtained
-    trajectories = BackAction.run_trajectories(sys, params)
+    trajectories = BackAction.run_trajectories_gillipsie(sys, params)
     for traj in trajectories
         states = BackAction.states_atjumps(traj, sys, params.psi0)
         counter = 1

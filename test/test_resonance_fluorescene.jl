@@ -12,7 +12,7 @@ psireset[1] = 1
 ################## Average Simulation ################3
 # Generate a set of trajectories and states
 
-trajectories = BackAction.run_trajectories(sys, params; psireset=psireset, progbar=true)
+trajectories = BackAction.run_trajectories_gillipsie(sys, params; psireset=psireset, progbar=true)
 
 @testset "Resonance Fluorescene: Expectation Value Convergence" begin
     ntimes = size(t_given)[1]

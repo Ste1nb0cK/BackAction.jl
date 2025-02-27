@@ -42,7 +42,7 @@ sys = BackAction.rdt_sys
     end
 
     # Generic case
-    trajectories = BackAction.run_trajectories(sys, params)
+    trajectories = BackAction.run_trajectories_gillipsie(sys, params)
     # for traj in trajectories
     for traj in trajectories
         jumpdts = [click.time for click in traj]
@@ -97,7 +97,7 @@ sys = BackAction.rdt_sys
     # Check that empty time vector returns empty vector
     @test isempty(states_empty)
     # Generic case
-    trajectories = BackAction.run_trajectories(sys, params)
+    trajectories = BackAction.run_trajectories_gillipsie(sys, params)
     for traj in trajectories
         if isempty(traj)
             continue

@@ -32,7 +32,7 @@ function f_drivenqubit(t, r)
 end
 
 # Trajectory Sampling
-sampled_trajectories = run_trajectories(sys, params);
+sampled_trajectories = run_trajectories_gillipsie(sys, params);
 
 @testset "Driven Qubit: Expectation Value Convergence" begin
     # Lindblad Evolution of Observables

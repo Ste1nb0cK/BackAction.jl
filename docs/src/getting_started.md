@@ -110,7 +110,7 @@ The data about a click is modeled by the struct `DetectionClick` [(more info)](@
 To obtain a sample of trajectories one uses `run_trajectories`, this returns a vector of trajectories as the sample :
 
 ```@example workflow1
-data = run_trajectories(sys, params)
+data = run_trajectories_gillipsie(sys, params)
 for k in 1:3
     println(data[k])
 end
