@@ -418,7 +418,7 @@ function states_att(t_given::Vector{T2}, jumptimes::Vector{T2}, labels::Vector{T
     psi = copy(psi0)
     ntimes = length(t_given)
     jump_states = states_atjumps(jumptimes, labels, sys, psi0; normalize=normalize)
-    njumps = size(jumptimes)
+    njumps = length(jumptimes)
     t_ = 0
     counter = 1
     counter_c = 1
