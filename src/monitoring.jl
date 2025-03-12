@@ -77,6 +77,15 @@ function add_cfield_hamiltonian_correctionterm(H::TH, Ls::Vector{TJ}, alpha::Vec
     end
 end
 
+################### STUFF FOR CALCULATING THE DERIVATIVE OF THE EXPONENTIAL
+# TH must be a vector appropiate for storing 4 matrices 
+function get_stencilpoints!(He::TH, points_vector::Vector{Matrix{T1}}, theta::Vector{T2},
+    dtheta::Vector{T2}) where {T1<:Complex,T2<:Real,TH<:Function}
+    points_vector[1] = He((theta + 2 * dtheta)...)
+    points_vector[2] = He((theta + 1 * dtheta)...)
+    points_vector[3] = He((theta - 1 * dtheta)...)
+    points_vector[4] = He((theta - 2 * dtheta)...)
+end
 """
 
 ```
