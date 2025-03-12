@@ -47,7 +47,7 @@ of the vector ``\\theta``.
 !!! todo "TODO: add an example"
     Preferably one in which  ``\\partial_i H_e`` commutes with ``H_e``, those are easier.
 """
-function expheff_derivative(Heff_par::Function, tau::Float64, theta::Vector{Float64}, dtheta::Vector{Float64})
+function expheff_derivative(Heff_par::Function, tau::T2, theta::Vector{T2}, dtheta::Vector{T2}) where {T2<:Real}
     f1 = exp(-1im * tau * Heff_par((theta + 2 * dtheta)...))
     f2 = exp(-1im * tau * Heff_par((theta + 1 * dtheta)...))
     f3 = exp(-1im * tau * Heff_par((theta - 1 * dtheta)...))
@@ -74,7 +74,7 @@ Calculate the derivatives of the list of jump operators.
     The derivative is calculate using the five-point stencil rule.
 
 """
-function jumpoperators_derivatives(Ls_par, theta::Vector{Float64}, dtheta::Vector{Float64})
+function jumpoperators_derivatives(Ls_par, theta::Vector{T2}, dtheta::Vector{T2}) where {T2<:Real}
     nchannels = size(Ls_par)[1]
     nlevels = size(Ls_par[1](theta...))[1]
     dLs = zeros(ComplexF64, nlevels, nlevels, nchannels)
@@ -106,11 +106,11 @@ must be provided via `dL` and `dV`.
 !!! note "Initial State dependency"
     This is intended to be used when ``|\\psi_0\\rangle`` doesn't have dependeny on ``\\theta``.
 """
-function writederivative!(dpsi::SubArray{ComplexF64,1},
-    L::Matrix{ComplexF64},
-    dL::SubArray{ComplexF64,2},
-    V::Matrix{ComplexF64}, dV::Matrix{ComplexF64},
-    psi0::Vector{ComplexF64})
+function writederivative!(dpsi::SubArray{T1,1},
+    L::Matrix{T1},
+    dL::SubArray{T1,2},
+    V::Matrix{T1}, dV::Matrix{T1},
+    psi0::Vector{T1}) where {T1<:Complex}
     dpsi .= (dL * V + L * dV) * psi0
 end
 
@@ -132,12 +132,12 @@ must be provided via `dL` and `dV`, and also that of ``|\\psi(0)\\rangle`` as `d
 
 
 """
-function writederivative!(dpsi::SubArray{ComplexF64,1},
-    L::Matrix{ComplexF64},
-    dL::SubArray{ComplexF64,2},
-    V::Matrix{ComplexF64}, dV::Matrix{ComplexF64},
-    psi0::SubArray{ComplexF64,1},#Union{Vector{ComplexF64}, SubArray{ComplexF64}},
-    dpsi0::SubArray{ComplexF64,1})
+function writederivative!(dpsi::SubArray{T1,1},
+    L::Matrix{T1},
+    dL::SubArray{T1,2},
+    V::Matrix{T1}, dV::Matrix{T1},
+    psi0::SubArray{T1,1},#Union{Vector{ComplexF64}, SubArray{ComplexF64}},
+    dpsi0::SubArray{T1,1}) where {T1<:Complex}
     dpsi .= (dL * V + L * dV) * psi0 + L * V * dpsi0
 end
 
@@ -165,8 +165,8 @@ is the state just after the ``n-th`` jump in the trajectory. They are returned a
 !!! note "Derivative order "
     The derivative is calculated using the five-point stencil rule.
 """
-function derivatives_atjumps(sys::System, Heff_par::Function, Ls_par, traj::Trajectory, psi0::Vector{ComplexF64}, theta::Vector{Float64},
-    dtheta::Vector{Float64})
+function derivatives_atjumps(sys::System{T1,T3}, Heff_par::Function, Ls_par, traj::Trajectory{T2,T3}, psi0::Vector{T1},
+    theta::Vector{T2}, dtheta::Vector{T2}) where {T1<:Complex,T2<:Real,T3<:Int}
     # 0. Special Case: if the trajectory is empty, return an empty array
     if isempty(traj)
         return Array{ComplexF64}(undef, 0, 0)
@@ -175,7 +175,7 @@ function derivatives_atjumps(sys::System, Heff_par::Function, Ls_par, traj::Traj
     dLs = jumpoperators_derivatives(Ls_par, theta, dtheta)
     # 2.1 Setup
     njumps = size(traj)[1]
-    dpsis = zeros(ComplexF64, sys.NLEVELS, njumps)
+    dpsis = zeros(T1, sys.NLEVELS, njumps)
     # 2.2 Set up the first jump
     click = traj[1]
     label = click.label
@@ -205,7 +205,7 @@ function derivatives_atjumps(sys::System, Heff_par::Function, Ls_par, traj::Traj
 
 end
 
-function derivatives_atjumps(sys::System, Heff_par::Function, Ls_par,
+function derivatives_atjumps(sys::System{T1,T3}, Heff_par::Function, Ls_par,
     jumptimes::Vector{T2}, labels::Vector{T3}, psi0::Vector{T1},
     theta::Vector{T2},
     dtheta::Vector{T2}) where {T1<:Complex,T2<:Real,T3<:Int}
@@ -256,8 +256,8 @@ Calculate the monitoring operator when ``|\\psi(\\theta)\\rangle = V|\\psi_0\\ra
 depend on ``\\theta``, and write it at the `SubArray` `xi`. This is, calculate
 ``d|\\psi(\\theta)\\rangle = dV|\\psi_0\\rangle``.
 """
-function writexi!(xi::SubArray{ComplexF64,2}, dV::Matrix{ComplexF64},
-    psi::SubArray{ComplexF64,1}, psi0::Vector{ComplexF64})
+function writexi!(xi::SubArray{T1,2}, dV::Matrix{T1},
+    psi::SubArray{T1,1}, psi0::Vector{T1}) where {T1<:Complex}
     xi .= ((dV * psi0) .* adjoint(psi) + psi .* adjoint(dV * psi0)) / dot(psi, psi)
 end
 
@@ -273,9 +273,9 @@ Calculate the monitoring operator when ``|\\psi(\\theta)\\rangle = V|\\psi_N\\ra
 a state that depends on ``\\theta``, the result is written at the `SubArray` `xi`. This is, calculate
 ``d|\\psi(\\theta)\\rangle = dV|\\psi_N\\rangle + Vd|\\psi_N\\rangle ``.
 """
-function writexi!(xi::SubArray{ComplexF64,2}, V::Matrix{ComplexF64}, dV::Matrix{ComplexF64},
-    psijump::SubArray{ComplexF64,1}, dpsijump::SubArray{ComplexF64,1},
-    psi::SubArray{ComplexF64,1})
+function writexi!(xi::SubArray{T1,2}, V::Matrix{T1}, dV::Matrix{T1},
+    psijump::SubArray{T1,1}, dpsijump::SubArray{T1,1},
+    psi::SubArray{T1,1}) where {T1<:Complex}
     xi .= ((dV * psijump + V * dpsijump) .* adjoint(psi) + psi .* adjoint(dV * psijump + V * dpsijump)) / dot(psi, psi)
 end
 
@@ -292,13 +292,13 @@ times in `t_given`. The result is returned in an array of dimensions `(sys.NLEVE
 so to access it at the time `t` you would do
 `monitoringoperator(t_given, sys, Heff_par, Ls_par, traj, psi0, theta, dtheta)[:, :, t]`.
 """
-function monitoringoperator(t_given::Vector{Float64},
-    sys::System, Heff_par::Function, Ls_par, traj::Trajectory, psi0::Vector{ComplexF64}, theta::Vector{Float64},
-    dtheta::Vector{Float64})
+function monitoringoperator(t_given::Vector{T2},
+    sys::System{T1,T3}, Heff_par::Function, Ls_par, traj::Trajectory, psi0::Vector{T1}, theta::Vector{T2},
+    dtheta::Vector{T2}) where {T1<:Complex,T2<:Real,T3<:Int}
 
     # Special case: if the time array is empty, return an empty array
     if isempty(t_given)
-        return Array{ComplexF64}(undef, 0, 0, 0)
+        return Array{T1}(undef, 0, 0, 0)
     end
     psi = states_att(t_given, traj, sys, psi0; normalize=false)
     ntimes = size(t_given)[1]
@@ -306,7 +306,7 @@ function monitoringoperator(t_given::Vector{Float64},
     t_ = 0
     counter = 1
     counter_c = 1
-    xis = Array{ComplexF64}(undef, sys.NLEVELS, sys.NLEVELS, ntimes)
+    xis = Array{T1}(undef, sys.NLEVELS, sys.NLEVELS, ntimes)
     # Edge case
     if isempty(traj)
         while counter <= ntimes

@@ -67,7 +67,7 @@ obtained jump time. In this version the time jump sampling is done by calling `S
 """
 function gillipsiestep_returntau!(sys::System{T1,T3}, params::SimulParameters{T1,T2,T3}, W::Vector{T2},
     P::Vector{T2}, Vs::Array{T1}, ts::Vector{T2},
-    t::T2, psi::VecOrMat{T1}, traj::Trajectory{T2,T3}) where {T1<:Complex,T2<:Real,T3<:Int}
+    t::T2, psi::VecOrMat{T1}, traj::Trajectory{T2,T3})::T2 where {T1<:Complex,T2<:Real,T3<:Int}
     #Sample jump time and  move state to pre-jump state
     tau_index = StatsBase.sample(1:params.nsamples, StatsBase.weights(W))
     prejumpupdate!(Vs[:, :, tau_index], psi)
