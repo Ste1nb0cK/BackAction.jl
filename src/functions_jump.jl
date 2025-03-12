@@ -286,13 +286,13 @@ like  `states_atjumps(traj, sys, psi0)[:, k]`.
 In case `isempty(traj)=true` the returned array is also empty.
 
 """
-function states_atjumps(traj::Trajectory, sys::System,
-    psi0::Union{Vector{ComplexF64},Matrix{ComplexF64}}; normalize::Bool=true)
+function states_atjumps(traj::Vector{DetectionClick{T2,T3}}, sys::System,
+    psi0::Union{Vector{T1},Matrix{T1}}; normalize::Bool=true) where {T1<:Complex,T2<:Real,T3<:Int}
     njumps = size(traj)[1]
-    if isa(psi0, Vector{ComplexF64})
-        states = Array{ComplexF64}(undef, sys.NLEVELS, njumps)
+    if isa(psi0, Vector{T1})
+        states = Array{T1}(undef, sys.NLEVELS, njumps)
     elseif isa(psi0, Matrix{ComplexF64})
-        states = Array{ComplexF64}(undef, sys.NLEVELS, sys.NLEVELS, njumps)
+        states = Array{T1}(undef, sys.NLEVELS, sys.NLEVELS, njumps)
     end
     psi = copy(psi0)
     jump_counter = 1
@@ -339,9 +339,9 @@ and `(sys.NLEVELS, sys.NLEVELS, ntimes)` if it was mixed; `ntimes` is the number
 times in `t_given`. In case `isempty(t_given)=true` the returned array is also empty.
 
 """
-function states_att(t_given::Vector{Float64}, traj::Trajectory, sys::System,
-    psi0::Union{Vector{ComplexF64},Matrix{ComplexF64}};
-    normalize::Bool=true)
+function states_att(t_given::Vector{T2}, traj::Vector{DetectionClick{T2,T3}}, sys::System,
+    psi0::Union{Vector{T1},Matrix{T1}};
+    normalize::Bool=true) where {T1<:Complex,T2<:Real,T3<:Int}
     # Special case: if the time array is empty, return an empty array
     if isempty(t_given)
         return Array{ComplexF64}(undef, 0, 0) # empty 2 dimensional array
@@ -387,6 +387,71 @@ function states_att(t_given::Vector{Float64}, traj::Trajectory, sys::System,
     counter_c = counter_c + 1
     while (counter_c <= njumps) && (counter <= ntimes)
         timeclick = traj[counter_c].time
+        while (t_ < t_given[counter] < t_ + timeclick) && (counter <= ntimes)
+            prejumpupdate!(psi, exp(-1im * (t_given[counter] - t_) * sys.Heff),
+                fixlastindex(jump_states, counter_c - 1); normalize=normalize)
+            writestate!(states, psi, counter)
+            counter = counter + 1
+            if counter > ntimes
+                break
+            end
+        end
+        t_ = t_ + timeclick
+        counter_c = counter_c + 1
+    end
+
+    while counter <= ntimes
+        prejumpupdate!(psi, exp(-1im * (t_given[counter] - t_) * sys.Heff),
+            fixlastindex(jump_states, njumps); normalize=normalize)
+        writestate!(states, psi, counter)
+        counter = counter + 1
+    end
+    return states
+end
+
+function states_att(t_given::Vector{T2}, jumptimes::Vector{T2}, labels::Vector{T3},
+    sys::System, psi0::Vector{T1}; normalize::Bool=true) where {T1<:Complex,T2<:Real,T3<:Int}
+    # Special case: if the time array is empty, return an empty array
+    if isempty(t_given)
+        return Array{ComplexF64}(undef, 0, 0) # empty 2 dimensional array
+    end
+    psi = copy(psi0)
+    ntimes = length(t_given)
+    jump_states = states_atjumps(jumptimes, labels, sys, psi0; normalize=normalize)
+    njumps = size(jumptimes)
+    t_ = 0
+    counter = 1
+    counter_c = 1
+    # states = Array{ComplexF64}(undef, sys.NLEVELS, ntimes)
+    states = Array{T1}(undef, sys.NLEVELS, ntimes)
+    # Edge case: if the trajectory is empty, evaluate exponentials and return
+    if isempty(labels)
+        while counter <= ntimes
+            prejumpupdate!(psi, exp(-1im * (t_given[counter]) * sys.Heff), psi0;
+                normalize=normalize)
+            # fixlastindex(states, counter)
+            writestate!(states, psi, counter)
+            counter = counter + 1
+            if counter > ntimes
+                break
+            end
+        end
+        return states
+    end
+    # All the states before the first jump can be handled like this:
+    while (t_given[counter] < jumptimes[counter_c]) && (counter <= ntimes)
+        prejumpupdate!(psi, exp(-1im * (t_given[counter]) * sys.Heff), psi0;
+            normalize=normalize)
+        writestate!(states, psi, counter)
+        counter = counter + 1
+        if counter > ntimes
+            break
+        end
+    end
+    t_ = t_ + jumptimes[counter_c]
+    counter_c = counter_c + 1
+    while (counter_c <= njumps) && (counter <= ntimes)
+        timeclick = jumptimes[counter_c]
         while (t_ < t_given[counter] < t_ + timeclick) && (counter <= ntimes)
             prejumpupdate!(psi, exp(-1im * (t_given[counter] - t_) * sys.Heff),
                 fixlastindex(jump_states, counter_c - 1); normalize=normalize)

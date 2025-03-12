@@ -1,4 +1,4 @@
-export  System, SimulParameters, DetectionClick, Trajectory
+export System, SimulParameters, DetectionClick, Trajectory
 
 ################# SYSTEM #######################################################
 """
@@ -24,9 +24,9 @@ To create an instance it's enough to provide the hamiltonian and the jump operat
 `System(H::Matrix{ComplexF64}, Ls::Vector{Matrix{ComplexF64}})`
 
 """
-struct System{T1<:Complex}
-    NLEVELS::Int64 # Number of levels of the system
-    NCHANNELS::Int64 # Number of jump channels
+struct System{T1<:Complex,T3<:Int}
+    NLEVELS::T3 # Number of levels of the system
+    NCHANNELS::T3 # Number of jump channels
     H::Matrix{T1} # Hamiltonian
     Ls::Vector{Matrix{T1}} # List of jump operators
     LLs::Vector{Matrix{T1}} # List of L^\daggerL
@@ -39,26 +39,26 @@ struct System{T1<:Complex}
          `H::Matrix{ComplexF64}`
          `Ls::Vector{Matrix{ComplexF64}}`
 "
-   function System(H::Matrix{T1}, Ls::Vector{Matrix{T1}}) where T1<:Complex
+    function System(H::Matrix{T1}, Ls::Vector{Matrix{T1}}) where {T1<:Complex}
         NLEVELS = size(H)[1]
         NCHANNELS = size(Ls)[1] # Number of jump channels
         J = zeros(T1, NLEVELS, NLEVELS)
         LLs = Vector{Matrix{T1}}(undef, NCHANNELS)
         for k in 1:NCHANNELS
-            product = adjoint(Ls[k])*Ls[k]
+            product = adjoint(Ls[k]) * Ls[k]
             J = J + product
             LLs[k] = product
         end
-       He = H - 0.5im*J
-       new{T1}(NLEVELS, NCHANNELS, H, Ls, LLs, J, He)
+        He = H - 0.5im * J
+        new{T1,typeof(NLEVELS)}(NLEVELS, NCHANNELS, H, Ls, LLs, J, He)
     end
     "
         Constructor that allows specifying the alphas and the T's.
         The dimension of T must be Nxk, where k=lenght(Ls) but N might be arbitrary.
         It is expected for T to be unitary
     "
-    function  System(H::Matrix{T1}, Ls::Vector{Matrix{T1}},
-                     T::Matrix{T1}, alphas::Vector{T1}) where T1<:Complex
+    function System(H::Matrix{T1}, Ls::Vector{Matrix{T1}},
+        T::Matrix{T1}, alphas::Vector{T1}) where {T1<:Complex}
         NLEVELS = size(H)[1]
         NCHANNELS = size(T)[1] # Number of jump channels
         k = length(Ls) # number of original jump operators
@@ -69,20 +69,20 @@ struct System{T1<:Complex}
         Lprimes = [sum(T[i, j] * Ls[j] for j in 1:k) for i in 1:NCHANNELS]
         # Now add the fields and update the hamiltonian
         for i in 1:NCHANNELS
-            Lprimes[i] = Lprimes[i] + alphas[i]*I
-            H_ = H_ - 0.5im*(conj(alphas[i])*Lprimes[i] -alphas[i]*adjoint(Lprimes[i])  )
+            Lprimes[i] = Lprimes[i] + alphas[i] * I
+            H_ = H_ - 0.5im * (conj(alphas[i]) * Lprimes[i] - alphas[i] * adjoint(Lprimes[i]))
         end
 
         #  set the effective hamiltonian
         LLs = Vector{Matrix{T1}}(undef, NCHANNELS)
         J = zeros(T1, NLEVELS, NLEVELS)
         for k in 1:NCHANNELS
-            product = adjoint(Lprimes[k])*Lprimes[k]
+            product = adjoint(Lprimes[k]) * Lprimes[k]
             J = J + product
             LLs[k] = product
         end
-        He = H_ - 0.5im*J
-        new{T1}(NLEVELS, NCHANNELS, H_, Lprimes, LLs, J, He)
+        He = H_ - 0.5im * J
+        new{T1,typeof(NLEVELS)}(NLEVELS, NCHANNELS, H_, Lprimes, LLs, J, He)
     end
 
 end
@@ -107,13 +107,13 @@ label of the channel in which it occured.
 - `time::Float64`: Waiting time
 - `label::Int64`: Label of the channel of the click
  """
-struct DetectionClick{T1<:Real, T2<:Int}
-    time::T1
-    label::T2
+struct DetectionClick{T2<:Real,T3<:Int}
+    time::T2
+    label::T3
 end
 
 @doc "Alias for `Vector{DetectionClick}`"
-const Trajectory = Vector{DetectionClick}
+const Trajectory{T2,T3} = Vector{DetectionClick{T2,T3}}
 ################# SIMULATION PARAMETERS ########################################
 """
 
@@ -147,7 +147,7 @@ For the Gillipsie algorithm to work it's key to have a grid that's capable of
 resolving the statistical details of the WTD, this grid is taken in the interval
 `(0, tf*multiplier)`.
 """
-struct SimulParameters{T1<:Complex, T2<:Real, T3<:Int}
+struct SimulParameters{T1<:Complex,T2<:Real,T3<:Int}
     psi0::Vector{T1}
     nsamples::T3 # Number of samples in the finegrid
     seed::T3 # seed
@@ -159,14 +159,14 @@ struct SimulParameters{T1<:Complex, T2<:Real, T3<:Int}
     @doc "Inner constructor of `SimulParameters` SimulParameters(psi0::Vector{ComplexF64}, tf::Float64,
         s::Int64, ntraj::Int64, nsamples::Int64=10000, m::Float64=10.0,
                              eps::Float64=1e-3)"
-    function SimulParameters(psi0::Union{Vector{T1}, Matrix{T1}}, tf::T2,
-                             s::T3, ntraj::T3, nsamples::T3=10000, m::T2=10.0,
-                             eps::T2=1e-3) where {T1<:Complex, T2<:Real, T3<:Int}
-        deltat = m*tf/nsamples
-        new{T1, T2, T3}(psi0, nsamples, s, ntraj, m, tf, deltat, eps)
+    function SimulParameters(psi0::Union{Vector{T1},Matrix{T1}}, tf::T2,
+        s::T3, ntraj::T3, nsamples::T3=10000, m::T2=10.0,
+        eps::T2=1e-3) where {T1<:Complex,T2<:Real,T3<:Int}
+        deltat = m * tf / nsamples
+        new{T1,T2,T3}(psi0, nsamples, s, ntraj, m, tf, deltat, eps)
     end
 end
 Base.show(io::IO, s::SimulParameters) = print(io,
-"SimulParameters(psi0=$(s.psi0)\nnsamples=$(s.nsamples)\nseed=$(s.seed)\nntraj=$(s.ntraj))\nmultiplier=$(s.multiplier)\ntf=$(s.tf)\ndt=$(s.dt)\neps=$(s.eps))")
+    "SimulParameters(psi0=$(s.psi0)\nnsamples=$(s.nsamples)\nseed=$(s.seed)\nntraj=$(s.ntraj))\nmultiplier=$(s.multiplier)\ntf=$(s.tf)\ndt=$(s.dt)\neps=$(s.eps))")
 
 

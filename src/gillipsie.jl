@@ -11,10 +11,10 @@ where ``H_e`` is the effective hamiltonian of the system `sys`, and the results 
 in `Vs`, which is an array of dimensions `(sys.NLEVELS, sys.NLEVELS, nsamples)`. To access
 the exponential corresponding to `ts[k]` you would do `Vs[:, ;, k]`.
 """
-function setVs!(sys::System, nsamples::Int64, ts::Vector{Float64}, Vs::Array{ComplexF64})
+function setVs!(sys::System{T1,T3}, nsamples::T3, ts::Vector{T2}, Vs::Array{T1}) where {T1<:Complex,T2<:Real,T3<:Int}
     tmp = copy(sys.Heff)
     @inbounds @simd for k in 1:nsamples
-            Vs[:,:,k] = exp(-1im*ts[k]*sys.Heff)
+        Vs[:, :, k] = exp(-1im * ts[k] * sys.Heff)
     end
 end
 
@@ -29,11 +29,11 @@ Calculate the matrix producs ``VJV^\\dagger`` for each ``V``
 in  `Vs`, where  ``J=\\sum_k L_{k}^\\dagger L_k`` is  `sys.J`, and the results are written in `Qs` which is an array of dimensions
  `(sys.NLEVELS, sys.NLEVELS, nsamples)`. To access the product corresponding to `ts[k]` you would do `Qs[:, ;, k]`.
 """
-function setQs!(sys::System, nsamples::Int64,
-         ts::Vector{Float64}, Qs::Array{ComplexF64}, Vs::Array{ComplexF64})
-        @inbounds @simd for k in 1:nsamples
-            Qs[:, :, k] = Vs[:, :, k] * sys.J * adjoint(Vs[:, :, k])
-        end
+function setQs!(sys::System{T1,T3}, nsamples::T3,
+    ts::Vector{T2}, Qs::Array{T1}, Vs::Array{T1}) where {T1<:Complex,T2<:Real,T3<:Int}
+    @inbounds @simd for k in 1:nsamples
+        Qs[:, :, k] = Vs[:, :, k] * sys.J * adjoint(Vs[:, :, k])
+    end
 end
 
 
@@ -47,8 +47,8 @@ Precompute the ``Q(t_s)`` and ``V(t_s)`` necessary for running the *Quantum Gill
  [radaelli2024gillespie](@cite) with the time grid `ts`. The result is written in `Qs` and `Vs`.
 Under the hood, this simply calls `setVs!` and `setQs!`.
 """
-function precompute!(sys::System, nsamples::Int64,
-         ts::Vector{Float64}, Qs::Array{ComplexF64}, Vs::Array{ComplexF64})
+function precompute!(sys::System{T1,T3}, nsamples::T3,
+    ts::Vector{T2}, Qs::Array{T1}, Vs::Array{T1}) where {T1<:Complex,T2<:Real,T3<:Int}
 
     setVs!(sys, nsamples, ts, Vs)
     setQs!(sys, nsamples, ts, Qs, Vs)
@@ -65,9 +65,9 @@ gillipsiestep_returntau!(sys::System, params::SimulParameters, W::Vector{Float64
 Do a step of the Gillipsie algorithm, updating the state and the weights, and returning the
 obtained jump time. In this version the time jump sampling is done by calling `StatsBase`.
 """
-function gillipsiestep_returntau!(sys::System, params::SimulParameters, W::Vector{Float64},
-                        P::Vector{Float64}, Vs::Array{ComplexF64}, ts::Vector{Float64},
-                        t::Float64, psi::VecOrMat{ComplexF64}, traj::Trajectory )
+function gillipsiestep_returntau!(sys::System{T1,T3}, params::SimulParameters{T1,T2,T3}, W::Vector{T2},
+    P::Vector{T2}, Vs::Array{T1}, ts::Vector{T2},
+    t::T2, psi::VecOrMat{T1}, traj::Trajectory{T2,T3}) where {T1<:Complex,T2<:Real,T3<:Int}
     #Sample jump time and  move state to pre-jump state
     tau_index = StatsBase.sample(1:params.nsamples, StatsBase.weights(W))
     prejumpupdate!(Vs[:, :, tau_index], psi)
@@ -97,9 +97,9 @@ Do a step of the Gillipsie algorithm, updating the state and the weights, and re
 obtained jump time. In this version the time is extracted using inversion sampling instead of
 calling `StatsBase`.
 """
-function gillipsiestep_returntau!(sys::System, params::SimulParameters, W::Vector{Float64},
-                        P::Vector{Float64}, Vs::Array{ComplexF64}, ts::Vector{Float64},
-                        t::Float64, psi::VecOrMat{ComplexF64}, traj::Trajectory, Qs::Array{ComplexF64}  )
+function gillipsiestep_returntau!(sys::System{T1,T3}, params::SimulParameters{T1,T2,T3}, W::Vector{T2},
+    P::Vector{T2}, Vs::Array{T1}, ts::Vector{T2},
+    t::T2, psi::VecOrMat{T1}, traj::Trajectory{T2,T3}, Qs::Array{T1}) where {T1<:Complex,T2<:Real,T3<:Int}
     tau_index = sampletauindex!(W, Qs, psi, params)
     # in case the last index was at the last index, return already to avoid errors with dark states
     if tau_index == params.nsamples
@@ -117,9 +117,6 @@ function gillipsiestep_returntau!(sys::System, params::SimulParameters, W::Vecto
     return tau
 
 end
-
-
-
 
 ############# Single Trajectory Routine ######################
 """
@@ -147,12 +144,12 @@ Sample a jump trajectory for the system `sys` using the *Quantum Gillipsie Algor
 # Returns
 - `traj::Trajectory`: vector with the obtained detection clicks.
 """
-function run_singletrajectory_gillipsie(sys::System, params::SimulParameters,
-    W::Vector{Float64}, P::Vector{Float64}, ts::Vector{Float64},
-    Qs::Array{ComplexF64}, Vs::Array{ComplexF64}; seed::Int64 = 1)
+function run_singletrajectory_gillipsie(sys::System{T1,T3}, params::SimulParameters{T1,T2,T3},
+    W::Vector{T2}, P::Vector{T2}, ts::Vector{T2},
+    Qs::Array{T1}, Vs::Array{T1}; seed::T3=1) where {T1<:Complex,T2<:Real,T3<:Int}
     Random.seed!(seed)
     channel = 0
-    traj = Vector{DetectionClick}()
+    traj = Vector{DetectionClick{T2,T3}}()
     psi = copy(params.psi0)
     t::Float64 = 0
     channel = 0
@@ -176,15 +173,15 @@ Same as `run_singletrajectory_gillipsie` but uses `psireset` to optimize the jum
 by exploiting the process is renewal. Additionally, `W0` must be provided to sample the
 first jump from the initial state, which may not coincide with `psireset`.
 """
-function run_singletrajectory_gillipsie_renewal(sys::System, params::SimulParameters,
-    W::Vector{Float64}, W0::Vector{Float64}, P::Vector{Float64}, ts::Vector{Float64},
-    Qs::Array{ComplexF64}, Vs::Array{ComplexF64}, psireset::VecOrMat{ComplexF64};
-    seed::Int64 = 1)
+function run_singletrajectory_gillipsie_renewal(sys::System{T1,T3}, params::SimulParameters{T1,T2,T3},
+    W::Vector{T2}, W0::Vector{T2}, P::Vector{T2}, ts::Vector{T2},
+    Qs::Array{T1}, Vs::Array{T1}, psireset::VecOrMat{T1};
+    seed::T3=1) where {T1<:Complex,T2<:Real,T3<:Int}
     Random.seed!(seed)
     channel = 0
-    traj = Vector{DetectionClick}()
+    traj = Vector{DetectionClick{T2,T3}}()
     psi = copy(params.psi0)
-    t::Float64 = 0
+    t::T2 = 0
     channel = 0
     # For the first jump use the WTD of the initial state
     t = gillipsiestep_returntau!(sys, params, W0, P, Vs, ts, t, psi, traj)

@@ -205,6 +205,47 @@ function derivatives_atjumps(sys::System, Heff_par::Function, Ls_par, traj::Traj
 
 end
 
+function derivatives_atjumps(sys::System, Heff_par::Function, Ls_par,
+    jumptimes::Vector{T2}, labels::Vector{T3}, psi0::Vector{T1},
+    theta::Vector{T2},
+    dtheta::Vector{T2}) where {T1<:Complex,T2<:Real,T3<:Int}
+    # 0. Special Case: if the trajectory is empty, return an empty array
+    if isempty(jumptimes)
+        return Array{ComplexF64}(undef, 0, 0)
+    end
+    # 1. Get the derivatives of L
+    dLs = jumpoperators_derivatives(Ls_par, theta, dtheta)
+    # 2.1 Setup
+    njumps = length(jumptimes)
+    dpsis = zeros(T1, sys.NLEVELS, njumps)
+    # 2.2 Set up the first jump
+    label = labels[1]
+    tau = jumptimes[1]
+    writederivative!(fixlastindex(dpsis, 1),
+        sys.Ls[label], fixlastindex(dLs, label),
+        exp(-1im * tau * sys.Heff),
+        expheff_derivative(Heff_par, tau, theta, dtheta), psi0)
+    # In case there are no more jumps, return
+    if njumps == 1
+        return dpsis
+    end
+    # 3. Go over the rest of the jumps
+    psitildes = states_atjumps(jumptimes, labels, sys, psi0; normalize=false)
+    for k in 2:njumps
+        # Calculate the derivative
+        writederivative!(fixlastindex(dpsis, k),
+            sys.Ls[labels[k]], fixlastindex(dLs, labels[k]),
+            exp(-1im * jumptimes[k] * sys.Heff),
+            expheff_derivative(Heff_par, jumptimes[k], theta, dtheta),
+            fixlastindex(psitildes, k - 1), fixlastindex(dpsis, k - 1))
+    end
+    return dpsis
+
+end
+
+
+
+
 """
 
 ```
