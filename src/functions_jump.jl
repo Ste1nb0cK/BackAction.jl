@@ -293,7 +293,7 @@ like  `states_atjumps(traj, sys, psi0)[:, k]`.
 In case `isempty(traj)=true` the returned array is also empty.
 
 """
-function states_atjumps(traj::Trajectory{T2,T3}, sys::System{T1,T3},
+function states_atjumps(traj::Vector{DetectionClick{T2,T3}}, sys::System{T1,T3},
     psi0::Union{Vector{T1},Matrix{T1}}; normalize::Bool=true) where {T1<:Complex,T2<:Real,T3<:Int}
     njumps = size(traj)[1]
     if isa(psi0, Vector{T1})
@@ -314,7 +314,7 @@ end
 
 # This one works with the times and labels as vectors
 function states_atjumps(jumptimes::Vector{T2}, labels::Vector{T3}, sys::System{T1,T3},
-    psi0::Vector{T1}; normalize::Bool=true) where {T2<:Real,T3<:Int,T1<:Complex}
+    psi0::Vector{T1}; normalize::Bool=true) where {T1<:Complex,T2<:Real,T3<:Int}
     # T3 = eltype(psi0)
     njumps = length(jumptimes)
     states = Array{T1}(undef, sys.NLEVELS, njumps)

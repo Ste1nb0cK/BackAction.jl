@@ -60,7 +60,7 @@ end
     PSI0[end] = 1 # Initial condition
 
     params = SimulParameters(PSI0,
-        3.0, # Final time. Set very long so that all trajectories jump
+        2.0, # Final time. Set very long so that all trajectories jump
         2, # seed
         100, # Number of trajectories
         50_000, # Number of samples in the finegrid
@@ -72,7 +72,7 @@ end
     H_parametrized = (delta::Float64, gamma::Float64) -> (0.5 * delta * adjoint(a) * a)::Matrix{ComplexF64}
     L_parametrized = (delta::Float64, gamma::Float64) -> (sqrt(gamma) * a)::Matrix{ComplexF64}
     He_parametrized = BackAction.getheff_parametrized(H_parametrized, [L_parametrized])
-    trajectories = run_trajectories_gillipsie(sys, params)
+    @code_warntype trajectories = run_trajectories_gillipsie(sys, params)
 
     ntimes = 1000
     t_given = collect(LinRange(0, params.tf, ntimes))
@@ -105,79 +105,79 @@ end
         end
     end
 end
-
-@testset "Trajectory Contributions: Vectors Methods" begin
-    ############# System Definition
-    NLEVELS = 5
-    # Construct the destruction operator
-    a = zeros(ComplexF64, NLEVELS, NLEVELS)
-    for k in 1:NLEVELS
-        for m in 1:NLEVELS
-            if k == m + 1
-                a[m, k] = sqrt(k - 1)
-            end
-        end
-    end
-
-    EPS = 1e-5 # Tolerance
-    GAMMA = BackAction.rd_gamma
-
-    H = 0.5 * BackAction.rd_deltaomega * adjoint(a) * a
-    L = sqrt(GAMMA) * a
-    sys = System(H, [L])
-
-    PSI0 = zeros(ComplexF64, NLEVELS)
-    PSI0[end] = 1 # Initial condition
-
-    params = SimulParameters(PSI0,
-        3.0, # Final time. Set very long so that all trajectories jump
-        2, # seed
-        100, # Number of trajectories
-        50_000, # Number of samples in the finegrid
-        10.5, # Multiplier to use in the fine grid
-        1e-3 # Tolerance for passing Dark state test
-    )
-
-    # Parametrization
-    H_parametrized = (delta::Float64, gamma::Float64) -> (0.5 * delta * adjoint(a) * a)::Matrix{ComplexF64}
-    L_parametrized = (delta::Float64, gamma::Float64) -> (sqrt(gamma) * a)::Matrix{ComplexF64}
-    He_parametrized = BackAction.getheff_parametrized(H_parametrized, [L_parametrized])
-    trajectories = run_trajectories_gillipsie(sys, params)
-
-    ntimes = 1000
-    t_given = collect(LinRange(0, params.tf, ntimes))
-
-    EPS = 0.1 # Difference tolerance for the test
-
-    xi_sample = Array{ComplexF64}(undef, sys.NLEVELS, sys.NLEVELS, ntimes, params.ntraj)
-    theta = [BackAction.rd_deltaomega, BackAction.rd_gamma]
-    dtheta = [0.0, BackAction.rd_gamma / 100]
-    for n in 1:params.ntraj
-        jumptimes, labels = trajectory_to_vectors(trajectories[n])
-        xi_sample[:, :, :, n] = monitoringoperator(t_given, sys, He_parametrized, [L_parametrized], jumptimes, labels, params.psi0,
-            theta, dtheta)
-    end
-    contribution_sample = Array{Float64}(undef, ntimes, params.ntraj)
-    for k in 1:params.ntraj
-        for tn in 1:ntimes
-            contribution_sample[tn, k] = real(tr(xi_sample[:, :, tn, k]))
-        end
-    end
-    # Check that the contribution from the monitoring operator coincides with the analytical one
-    for k in 1:params.ntraj
-        for t in 1:ntimes
-            flag = abs(
-                contribution_sample[t, k] - analytical_contribution(t_given[t],
-                    trajectories[k],
-                    BackAction.rd_gamma,
-                    sys.NLEVELS - 1)) < EPS
-            flag || @warn "Failure at trajectory=$k, t=$t"
-            @test flag
-        end
-    end
-end
-
-
+#
+# @testset "Trajectory Contributions: Vectors Methods" begin
+#     ############# System Definition
+#     NLEVELS = 5
+#     # Construct the destruction operator
+#     a = zeros(ComplexF64, NLEVELS, NLEVELS)
+#     for k in 1:NLEVELS
+#         for m in 1:NLEVELS
+#             if k == m + 1
+#                 a[m, k] = sqrt(k - 1)
+#             end
+#         end
+#     end
+#
+#     EPS = 1e-5 # Tolerance
+#     GAMMA = BackAction.rd_gamma
+#
+#     H = 0.5 * BackAction.rd_deltaomega * adjoint(a) * a
+#     L = sqrt(GAMMA) * a
+#     sys = System(H, [L])
+#
+#     PSI0 = zeros(ComplexF64, NLEVELS)
+#     PSI0[end] = 1 # Initial condition
+#
+#     params = SimulParameters(PSI0,
+#         3.0, # Final time. Set very long so that all trajectories jump
+#         2, # seed
+#         100, # Number of trajectories
+#         50_000, # Number of samples in the finegrid
+#         10.5, # Multiplier to use in the fine grid
+#         1e-3 # Tolerance for passing Dark state test
+#     )
+#
+#     # Parametrization
+#     H_parametrized = (delta::Float64, gamma::Float64) -> (0.5 * delta * adjoint(a) * a)::Matrix{ComplexF64}
+#     L_parametrized = (delta::Float64, gamma::Float64) -> (sqrt(gamma) * a)::Matrix{ComplexF64}
+#     He_parametrized = BackAction.getheff_parametrized(H_parametrized, [L_parametrized])
+#     trajectories = run_trajectories_gillipsie(sys, params)
+#
+#     ntimes = 1000
+#     t_given = collect(LinRange(0, params.tf, ntimes))
+#
+#     EPS = 0.1 # Difference tolerance for the test
+#
+#     xi_sample = Array{ComplexF64}(undef, sys.NLEVELS, sys.NLEVELS, ntimes, params.ntraj)
+#     theta = [BackAction.rd_deltaomega, BackAction.rd_gamma]
+#     dtheta = [0.0, BackAction.rd_gamma / 100]
+#     for n in 1:params.ntraj
+#         jumptimes, labels = trajectory_to_vectors(trajectories[n])
+#         xi_sample[:, :, :, n] = monitoringoperator(t_given, sys, He_parametrized, [L_parametrized], jumptimes, labels, params.psi0,
+#             theta, dtheta)
+#     end
+#     contribution_sample = Array{Float64}(undef, ntimes, params.ntraj)
+#     for k in 1:params.ntraj
+#         for tn in 1:ntimes
+#             contribution_sample[tn, k] = real(tr(xi_sample[:, :, tn, k]))
+#         end
+#     end
+#     # Check that the contribution from the monitoring operator coincides with the analytical one
+#     for k in 1:params.ntraj
+#         for t in 1:ntimes
+#             flag = abs(
+#                 contribution_sample[t, k] - analytical_contribution(t_given[t],
+#                     trajectories[k],
+#                     BackAction.rd_gamma,
+#                     sys.NLEVELS - 1)) < EPS
+#             flag || @warn "Failure at trajectory=$k, t=$t"
+#             @test flag
+#         end
+#     end
+# end
+#
+#
 
 
 

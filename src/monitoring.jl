@@ -15,7 +15,7 @@ that's the  parametrization of the effective Hamiltonian.
     `Ls` are the same and in the same order.
 
 """
-function getheff_parametrized(H_par::Function, Ls_par)::Function
+function getheff_parametrized(H_par::Tf, Ls_par)::Function where {Tf<:Function}
     # here theta is expected to be a vector
     return (theta...) -> begin # Get an arbitrary number of arguments
         # The ... "splatts" the vector so it is passed as a tuple to the function
@@ -47,12 +47,20 @@ of the vector ``\\theta``.
 !!! todo "TODO: add an example"
     Preferably one in which  ``\\partial_i H_e`` commutes with ``H_e``, those are easier.
 """
-function expheff_derivative(Heff_par::Function, tau::T2, theta::Vector{T2}, dtheta::Vector{T2}) where {T2<:Real}
-    f1 = exp(-1im * tau * Heff_par((theta + 2 * dtheta)...))
-    f2 = exp(-1im * tau * Heff_par((theta + 1 * dtheta)...))
-    f3 = exp(-1im * tau * Heff_par((theta - 1 * dtheta)...))
-    f4 = exp(-1im * tau * Heff_par((theta - 2 * dtheta)...))
-    return (-f1 + 8 * f2 - 8 * f3 + f4) / (12 * norm(dtheta))
+function expheff_derivative(Heff_par::Tf, tau::T2, theta::Vector{T2}, dtheta::Vector{T2}) where {T2<:Real,Tf<:Function}
+    # f1 = exp(-1im * tau * Heff_par((theta + 2 * dtheta)...))
+    # f2 = exp(-1im * tau * Heff_par((theta + 1 * dtheta)...))
+    # f3 = exp(-1im * tau * Heff_par((theta - 1 * dtheta)...))
+    # f4 = exp(-1im * tau * Heff_par((theta - 2 * dtheta)...))
+    aux1 = -1im * tau
+    norm_dtheta = norm(dtheta)
+    return (-exp(aux1 * Heff_par((theta + 2 * dtheta)...))
+            +
+            8 * exp(aux1 * Heff_par((theta + 1 * dtheta)...))
+            -
+            8 * exp(aux1 * Heff_par((theta - 1 * dtheta)...))
+            +
+            exp(-1im * tau * Heff_par((theta - 2 * dtheta)...))) / (12 * norm_dtheta)
 end
 
 
@@ -74,16 +82,26 @@ Calculate the derivatives of the list of jump operators.
     The derivative is calculate using the five-point stencil rule.
 
 """
-function jumpoperators_derivatives(Ls_par, theta::Vector{T2}, dtheta::Vector{T2}) where {T2<:Real}
-    nchannels = size(Ls_par)[1]
+function jumpoperators_derivatives(Ls_par, theta::Vector{T2},
+    dtheta::Vector{T2}) where {T2<:Real}
+    nchannels = length(Ls_par)
     nlevels = size(Ls_par[1](theta...))[1]
-    dLs = zeros(ComplexF64, nlevels, nlevels, nchannels)
+    dLs = Array{ComplexF64}(undef, nlevels, nlevels, nchannels)
+    norm_dtheta = norm(dtheta)
     for k in 1:nchannels
-        f1 = Ls_par[k]((theta + 2 * dtheta)...)
-        f2 = Ls_par[k]((theta + dtheta)...)
-        f3 = Ls_par[k]((theta - dtheta)...)
-        f4 = Ls_par[k]((theta - 2 * dtheta)...)
-        dLs[:, :, k] = (-f1 + 8 * f2 - 8 * f3 + f4) / (12 * norm(dtheta))
+        # f1 = Ls_par[k]((theta + 2 * dtheta)...)
+        # f2 = Ls_par[k]((theta + dtheta)...)
+        # f3 = Ls_par[k]((theta - dtheta)...)
+        # f4 = Ls_par[k]((theta - 2 * dtheta)...)
+        dLs[:, :, k] = (
+            -Ls_par[k]((theta + 2 * dtheta)...)
+            +
+            8 * Ls_par[k]((theta + dtheta)...)
+            -
+            8 * Ls_par[k]((theta - dtheta)...)
+            +
+            Ls_par[k]((theta - 2 * dtheta)...)
+        ) / (12 * norm_dtheta)
     end
     return dLs
 end
@@ -246,8 +264,6 @@ function derivatives_atjumps(sys::System{T1,T3}, Heff_par::Function, Ls_par,
 end
 
 
-
-
 """
 
 ```
@@ -263,6 +279,15 @@ function writexi!(xi::SubArray{T1,2}, dV::Matrix{T1},
     xi .= ((dV * psi0) .* adjoint(psi) + psi .* adjoint(dV * psi0)) / dot(psi, psi)
 end
 
+# Method for when xi is a matrix at which we want to write at  and 
+# ``|\\psi(\\theta)\\rangle = V|\\psi_0\\rangle`` and ``|\\psi_0\\rangle`` doesn't
+# depend on ``\\theta``
+function writexi!(xi::Matrix{T1}, dV::Matrix{T1},
+    psi::SubArray{T1,1}, psi0::Vector{T1}) where {T1<:Complex}
+    xi .= ((dV * psi0) .* adjoint(psi) + psi .* adjoint(dV * psi0)) / dot(psi, psi)
+end
+
+
 """
 
 ```
@@ -276,6 +301,13 @@ a state that depends on ``\\theta``, the result is written at the `SubArray` `xi
 ``d|\\psi(\\theta)\\rangle = dV|\\psi_N\\rangle + Vd|\\psi_N\\rangle ``.
 """
 function writexi!(xi::SubArray{T1,2}, V::Matrix{T1}, dV::Matrix{T1},
+    psijump::SubArray{T1,1}, dpsijump::SubArray{T1,1},
+    psi::SubArray{T1,1}) where {T1<:Complex}
+    xi .= ((dV * psijump + V * dpsijump) .* adjoint(psi) + psi .* adjoint(dV * psijump + V * dpsijump)) / dot(psi, psi)
+end
+
+# Method for when xi is a matrix
+function writexi!(xi::Matrix{T1}, V::Matrix{T1}, dV::Matrix{T1},
     psijump::SubArray{T1,1}, dpsijump::SubArray{T1,1},
     psi::SubArray{T1,1}) where {T1<:Complex}
     xi .= ((dV * psijump + V * dpsijump) .* adjoint(psi) + psi .* adjoint(dV * psijump + V * dpsijump)) / dot(psi, psi)
@@ -308,13 +340,14 @@ function monitoringoperator(t_given::Vector{T2},
     t_ = 0
     counter = 1
     counter_c = 1
-    xis = Array{T1}(undef, sys.NLEVELS, sys.NLEVELS, ntimes)
+    xis = ntimes > 1 ? Array{T1}(undef, sys.NLEVELS, sys.NLEVELS, ntimes) : Matrix{T1}(undef, sys.NLEVELS, sys.NLEVELS)
     # Edge case
     if isempty(traj)
         while counter <= ntimes
             writexi!(fixlastindex(xis, counter),
                 expheff_derivative(Heff_par, t_given[counter], theta, dtheta),
                 fixlastindex(psi, counter), psi0)
+
             counter = counter + 1
             if counter > ntimes
                 break
@@ -378,13 +411,17 @@ function monitoringoperator(t_given::Vector{T2},
     t_ = 0
     counter = 1
     counter_c = 1
-    xis = Array{T1}(undef, sys.NLEVELS, sys.NLEVELS, ntimes)
+    xis = ntimes > 1 ? Array{T1}(undef, sys.NLEVELS, sys.NLEVELS, ntimes) : Matrix{T1}(undef, sys.NLEVELS, sys.NLEVELS)
     # Edge case
     if isempty(labels)
         while counter <= ntimes
-            writexi!(fixlastindex(xis, counter),
+            ntimes > 1 ? writexi!(fixlastindex(xis, counter),
+                expheff_derivative(Heff_par, t_given[counter], theta, dtheta),
+                fixlastindex(psi, counter), psi0) :
+            writexi!(xis,
                 expheff_derivative(Heff_par, t_given[counter], theta, dtheta),
                 fixlastindex(psi, counter), psi0)
+
             counter = counter + 1
             if counter > ntimes
                 break
@@ -394,7 +431,10 @@ function monitoringoperator(t_given::Vector{T2},
     end
     # Evaluations before first jump
     while (t_given[counter] < jumptimes[counter_c]) && (counter <= ntimes)
-        writexi!(fixlastindex(xis, counter),
+        ntimes > 1 ? writexi!(fixlastindex(xis, counter),
+            expheff_derivative(Heff_par, t_given[counter], theta, dtheta),
+            fixlastindex(psi, counter), psi0) :
+        writexi!(xis,
             expheff_derivative(Heff_par, t_given[counter], theta, dtheta),
             fixlastindex(psi, counter), psi0)
         counter = counter + 1
@@ -410,7 +450,11 @@ function monitoringoperator(t_given::Vector{T2},
     while (counter_c <= njumps) && (counter <= ntimes)
         timeclick = jumptimes[counter_c]
         while (t_ < t_given[counter] < t_ + timeclick) && (counter <= ntimes)
-            writexi!(fixlastindex(xis, counter), exp(-1im * (t_given[counter] - t_) * sys.Heff),
+            ntimes > 1 ? writexi!(fixlastindex(xis, counter), exp(-1im * (t_given[counter] - t_) * sys.Heff),
+                expheff_derivative(Heff_par, t_given[counter] - t_, theta, dtheta),
+                fixlastindex(psijumps, counter_c - 1), fixlastindex(dpsijumps, counter_c - 1),
+                fixlastindex(psi, counter)) :
+            writexi!(xis, exp(-1im * (t_given[counter] - t_) * sys.Heff),
                 expheff_derivative(Heff_par, t_given[counter] - t_, theta, dtheta),
                 fixlastindex(psijumps, counter_c - 1), fixlastindex(dpsijumps, counter_c - 1),
                 fixlastindex(psi, counter))
@@ -424,10 +468,15 @@ function monitoringoperator(t_given::Vector{T2},
     end
 
     while counter <= ntimes
-        writexi!(fixlastindex(xis, counter), exp(-1im * (t_given[counter] - t_) * sys.Heff),
+        ntimes > 1 ? writexi!(fixlastindex(xis, counter), exp(-1im * (t_given[counter] - t_) * sys.Heff),
+            expheff_derivative(Heff_par, t_given[counter] - t_, theta, dtheta),
+            fixlastindex(psijumps, njumps), fixlastindex(dpsijumps, njumps),
+            fixlastindex(psi, counter)) :
+        writexi!(xis, exp(-1im * (t_given[counter] - t_) * sys.Heff),
             expheff_derivative(Heff_par, t_given[counter] - t_, theta, dtheta),
             fixlastindex(psijumps, njumps), fixlastindex(dpsijumps, njumps),
             fixlastindex(psi, counter))
+
 
         counter = counter + 1
     end
