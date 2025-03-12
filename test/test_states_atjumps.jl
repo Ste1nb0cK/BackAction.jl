@@ -22,10 +22,10 @@ function identifystate_jump(s::Vector{ComplexF64})
     end
 end
 
-function trajectory_to_vectors(traj::Trajectory)
+function trajectory_to_vectors(traj::Trajectory{T2,T3}) where {T2<:Real,T3<:Int}
     njumps = length(traj)
-    jumptimes = Vector{Float64}(undef, njumps)
-    labels = Vector{Int64}(undef, njumps)
+    jumptimes = Vector{T2}(undef, njumps)
+    labels = Vector{T3}(undef, njumps)
     for k in 1:njumps
         jumptimes[k] = traj[k].time
         labels[k] = traj[k].label

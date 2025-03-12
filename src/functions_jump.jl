@@ -293,7 +293,7 @@ like  `states_atjumps(traj, sys, psi0)[:, k]`.
 In case `isempty(traj)=true` the returned array is also empty.
 
 """
-function states_atjumps(traj::Vector{DetectionClick{T2,T3}}, sys::System{T1,T3},
+function states_atjumps(traj::Trajectory{T2,T3}, sys::System{T1,T3},
     psi0::Union{Vector{T1},Matrix{T1}}; normalize::Bool=true) where {T1<:Complex,T2<:Real,T3<:Int}
     njumps = size(traj)[1]
     if isa(psi0, Vector{T1})
@@ -313,11 +313,11 @@ function states_atjumps(traj::Vector{DetectionClick{T2,T3}}, sys::System{T1,T3},
 end
 
 # This one works with the times and labels as vectors
-function states_atjumps(jumptimes::Vector{T1}, labels::Vector{T2}, sys::System{T1,T3},
-    psi0::Vector{T3}; normalize::Bool=true) where {T1<:Real,T2<:Int,T3<:Complex}
+function states_atjumps(jumptimes::Vector{T2}, labels::Vector{T3}, sys::System{T1,T3},
+    psi0::Vector{T1}; normalize::Bool=true) where {T2<:Real,T3<:Int,T1<:Complex}
     # T3 = eltype(psi0)
     njumps = length(jumptimes)
-    states = Array{T3}(undef, sys.NLEVELS, njumps)
+    states = Array{T1}(undef, sys.NLEVELS, njumps)
     psi = copy(psi0)
     jump_counter = 1
     for k in 1:njumps
