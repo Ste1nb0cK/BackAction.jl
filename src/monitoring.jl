@@ -210,13 +210,13 @@ function derivatives_atjumps(sys::System{T1,T3}, Heff_par::Function, Ls_par,
     theta::Vector{T2},
     dtheta::Vector{T2}) where {T1<:Complex,T2<:Real,T3<:Int}
     # 0. Special Case: if the trajectory is empty, return an empty array
-    if isempty(jumptimes)
+    if isempty(labels)
         return Array{ComplexF64}(undef, 0, 0)
     end
     # 1. Get the derivatives of L
     dLs = jumpoperators_derivatives(Ls_par, theta, dtheta)
     # 2.1 Setup
-    njumps = length(jumptimes)
+    njumps = length(labels)
     dpsis = zeros(T1, sys.NLEVELS, njumps)
     # 2.2 Set up the first jump
     label = labels[1]
@@ -233,10 +233,12 @@ function derivatives_atjumps(sys::System{T1,T3}, Heff_par::Function, Ls_par,
     psitildes = states_atjumps(jumptimes, labels, sys, psi0; normalize=false)
     for k in 2:njumps
         # Calculate the derivative
+        label = labels[k]
+        tau = jumptimes[k]
         writederivative!(fixlastindex(dpsis, k),
-            sys.Ls[labels[k]], fixlastindex(dLs, labels[k]),
-            exp(-1im * jumptimes[k] * sys.Heff),
-            expheff_derivative(Heff_par, jumptimes[k], theta, dtheta),
+            sys.Ls[label], fixlastindex(dLs, label),
+            exp(-1im * tau * sys.Heff),
+            expheff_derivative(Heff_par, tau, theta, dtheta),
             fixlastindex(psitildes, k - 1), fixlastindex(dpsis, k - 1))
     end
     return dpsis
@@ -293,7 +295,7 @@ so to access it at the time `t` you would do
 `monitoringoperator(t_given, sys, Heff_par, Ls_par, traj, psi0, theta, dtheta)[:, :, t]`.
 """
 function monitoringoperator(t_given::Vector{T2},
-    sys::System{T1,T3}, Heff_par::Function, Ls_par, traj::Trajectory, psi0::Vector{T1}, theta::Vector{T2},
+    sys::System{T1,T3}, Heff_par::Function, Ls_par, traj::Trajectory{T2,T3}, psi0::Vector{T1}, theta::Vector{T2},
     dtheta::Vector{T2}) where {T1<:Complex,T2<:Real,T3<:Int}
 
     # Special case: if the time array is empty, return an empty array
@@ -361,3 +363,74 @@ function monitoringoperator(t_given::Vector{T2},
     end
     return xis
 end
+
+function monitoringoperator(t_given::Vector{T2},
+    sys::System{T1,T3}, Heff_par::Function, Ls_par, jumptimes::Vector{T2}, labels::Vector{T3}, psi0::Vector{T1}, theta::Vector{T2},
+    dtheta::Vector{T2}) where {T1<:Complex,T2<:Real,T3<:Int}
+
+    # Special case: if the time array is empty, return an empty array
+    if isempty(t_given)
+        return Array{T1}(undef, 0, 0, 0)
+    end
+    psi = states_att(t_given, jumptimes, labels, sys, psi0; normalize=false)
+    ntimes = length(t_given)
+    njumps = length(labels)
+    t_ = 0
+    counter = 1
+    counter_c = 1
+    xis = Array{T1}(undef, sys.NLEVELS, sys.NLEVELS, ntimes)
+    # Edge case
+    if isempty(labels)
+        while counter <= ntimes
+            writexi!(fixlastindex(xis, counter),
+                expheff_derivative(Heff_par, t_given[counter], theta, dtheta),
+                fixlastindex(psi, counter), psi0)
+            counter = counter + 1
+            if counter > ntimes
+                break
+            end
+        end
+        return xis
+    end
+    # Evaluations before first jump
+    while (t_given[counter] < jumptimes[counter_c]) && (counter <= ntimes)
+        writexi!(fixlastindex(xis, counter),
+            expheff_derivative(Heff_par, t_given[counter], theta, dtheta),
+            fixlastindex(psi, counter), psi0)
+        counter = counter + 1
+        if counter > ntimes
+            break
+        end
+    end
+    dpsijumps = derivatives_atjumps(sys, Heff_par, Ls_par, jumptimes, labels, psi0, theta, dtheta)
+    psijumps = states_atjumps(jumptimes, labels, sys, psi0; normalize=false)
+    t_ = t_ + jumptimes[counter_c]
+    counter_c = counter_c + 1
+    # Evaluation after first jump
+    while (counter_c <= njumps) && (counter <= ntimes)
+        timeclick = jumptimes[counter_c]
+        while (t_ < t_given[counter] < t_ + timeclick) && (counter <= ntimes)
+            writexi!(fixlastindex(xis, counter), exp(-1im * (t_given[counter] - t_) * sys.Heff),
+                expheff_derivative(Heff_par, t_given[counter] - t_, theta, dtheta),
+                fixlastindex(psijumps, counter_c - 1), fixlastindex(dpsijumps, counter_c - 1),
+                fixlastindex(psi, counter))
+            counter = counter + 1
+            if counter > ntimes
+                break
+            end
+        end
+        t_ = t_ + timeclick
+        counter_c = counter_c + 1
+    end
+
+    while counter <= ntimes
+        writexi!(fixlastindex(xis, counter), exp(-1im * (t_given[counter] - t_) * sys.Heff),
+            expheff_derivative(Heff_par, t_given[counter] - t_, theta, dtheta),
+            fixlastindex(psijumps, njumps), fixlastindex(dpsijumps, njumps),
+            fixlastindex(psi, counter))
+
+        counter = counter + 1
+    end
+    return xis
+end
+
