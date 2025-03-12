@@ -1,6 +1,6 @@
 # Description: generic functions used by the jump trajectory methods
 
-export   states_att, states_atjumps
+export states_att, states_atjumps
 
 """
 
@@ -42,8 +42,8 @@ is typically in the thousands.
 """
 function calculatewtdweights!(W::Array{Float64}, Qs::Array{ComplexF64}, psi::Vector{ComplexF64}, params::SimulParameters)
     @inbounds @simd for k in 1:params.nsamples
-           W[k] = real(dot(psi, Qs[:, :, k], psi)) # dot product without storing A*x. THIS IS THE KEY FOR SPEED
-        end
+        W[k] = real(dot(psi, Qs[:, :, k], psi)) # dot product without storing A*x. THIS IS THE KEY FOR SPEED
+    end
 end
 
 
@@ -61,8 +61,8 @@ is typically in the thousands.
 """
 function calculatewtdweights!(W::Array{Float64}, Qs::Array{ComplexF64}, psi::Matrix{ComplexF64}, params::SimulParameters)
     @inbounds @simd for k in 1:params.nsamples
-           W[k] = real(tr(Qs[:, :, k] * psi))
-        end
+        W[k] = real(tr(Qs[:, :, k] * psi))
+    end
 end
 
 
@@ -79,7 +79,7 @@ Calculate the probabilities for a pure state ``|\\psi\\rangle`` to jump to any o
 function calculatechannelweights!(P::Vector{Float64}, psi::Vector{ComplexF64}, sys::System)
     aux_P = real(dot(psi, sys.J * psi))
     @inbounds @simd for k in 1:sys.NCHANNELS
-        P[k] = norm(sys.Ls[k]*psi)^2
+        P[k] = norm(sys.Ls[k] * psi)^2
     end
     P .= P / aux_P
 end
@@ -98,7 +98,7 @@ Calculate the probabilities for a mixed state ``\\psi`` to jump to any of the gi
 function calculatechannelweights!(P::Vector{Float64}, psi::Matrix{ComplexF64}, sys::System)
     aux_P = real(dot(psi, sys.J * psi))
     @inbounds @simd for k in 1:sys.NCHANNELS
-       P[k] = real(tr(sys.LLs[k]*psi))
+        P[k] = real(tr(sys.LLs[k] * psi))
     end
     P .= P / aux_P
 end
@@ -116,7 +116,7 @@ if `normalize=true` it also normalizes the final state.
 function prejumpupdate!(V::Matrix{ComplexF64}, psi::Vector{ComplexF64}; normalize=false)
     psi .= V * psi
     if normalize
-        psi .= psi/ norm(psi)
+        psi .= psi / norm(psi)
     end
 end
 
@@ -131,10 +131,10 @@ Do the pure state transformation ``|\\psi_0\\rangle\\to V|\\psi_0\\rangle`` and 
 result in `psi`, if `normalize=true` it also normalizes the final state.
 """
 function prejumpupdate!(psi::Vector{ComplexF64}, V::Matrix{ComplexF64},
-                        psi0::Union{Vector{ComplexF64}, SubArray{ComplexF64}}; normalize=false)
+    psi0::Union{Vector{ComplexF64},SubArray{ComplexF64}}; normalize=false)
     psi .= V * psi0
     if normalize
-        psi .= psi/ norm(psi)
+        psi .= psi / norm(psi)
     end
 end
 
@@ -149,10 +149,10 @@ Do the mixed state transformation ``\\psi_0\\to V\\psi_0 V^\\dagger`` and store 
 result in `psi`, if `normalize=true` it also normalizes the final state.
 """
 function prejumpupdate!(psi::Matrix{ComplexF64}, V::Matrix{ComplexF64},
-                        psi0::Union{Matrix{ComplexF64}, SubArray{ComplexF64}}; normalize=false)
+    psi0::Union{Matrix{ComplexF64},SubArray{ComplexF64}}; normalize=false)
     psi .= V * psi0 * adjoint(V)
     if normalize
-        psi .= psi/ tr(psi)
+        psi .= psi / tr(psi)
     end
 end
 
@@ -169,7 +169,7 @@ if `normalize=true` it also normalizes the final state.
 function prejumpupdate!(V::Matrix{ComplexF64}, psi::Matrix{ComplexF64}; normalize=false)
     psi .= V * psi * adjoint(V)
     if normalize
-        psi .= psi/ tr(psi)
+        psi .= psi / tr(psi)
     end
 end
 
@@ -184,10 +184,10 @@ Do the pure state transformation ``|\\psi\\rangle\\to L|\\psi\\rangle`` modifyin
 if `normalize=true` it also normalizes the final state.
 """
 function postjumpupdate!(L::Matrix{ComplexF64}, psi::Vector{ComplexF64}; normalize=true)
-        psi .= L*psi # State without normalization
-        if normalize
-            psi .= psi / norm(psi)
-        end
+    psi .= L * psi # State without normalization
+    if normalize
+        psi .= psi / norm(psi)
+    end
 end
 
 
@@ -201,10 +201,10 @@ Do the pure mixed state transformation ``\\psi\\to L\\psi L^\\dagger`` modifying
 if `normalize=true` it also normalizes the final state.
 """
 function postjumpupdate!(L::Matrix{ComplexF64}, psi::Matrix{ComplexF64}; normalize=true)
-        psi .= L*psi*adjoint(L) # State without normalization
-        if normalize
-            psi .= psi / tr(psi)
-        end
+    psi .= L * psi * adjoint(L) # State without normalization
+    if normalize
+        psi .= psi / tr(psi)
+    end
 end
 
 """
@@ -217,7 +217,7 @@ Sample a jump time index from the state `psi` (pure or mixed), modfying `W` to w
 The technique is inversion sampling
 """
 function sampletauindex!(W::Vector{Float64}, Qs::Array{ComplexF64}, psi::Vector{ComplexF64},
-                         params::SimulParameters)
+    params::SimulParameters)
     # First, sample a random number and divide by dt to avoid multiplying by dt the weights
     alpha = rand() / params.dt
     u = 0.0
@@ -241,14 +241,14 @@ Sample a jump time index from the state `psi` (pure or mixed), modfying `W` to w
 The technique is inversion sampling
 """
 function sampletauindex!(W::Vector{Float64}, Qs::Array{ComplexF64}, psi::Matrix{ComplexF64},
-                         params::SimulParameters)
+    params::SimulParameters)
     # First, sample a random number and divide by dt to avoid multiplying by dt the weights
     alpha = rand() / params.dt
     u = 0.0
     # now sum until alpha is exceded
     tau_index = 1
     while u < alpha && tau_index < params.nsamples
-        u = u + real(tr(Qs[:, :, tau_index]* psi))
+        u = u + real(tr(Qs[:, :, tau_index] * psi))
         tau_index = tau_index + 1
     end
     return tau_index
@@ -266,8 +266,8 @@ writestate!(states::array{complexf64}, psi::union{vector{complexf64},
 Writes `psi` in `states` at the subarray with the last index fixed at `counter`.
 """
 function writestate!(states::Array{ComplexF64},
-                     psi::Union{Vector{ComplexF64}, Matrix{ComplexF64}}, counter::Int64)
-             fixlastindex(states, counter) .= psi
+    psi::Union{Vector{ComplexF64},Matrix{ComplexF64}}, counter::Int64)
+    fixlastindex(states, counter) .= psi
 end
 
 
@@ -287,23 +287,44 @@ In case `isempty(traj)=true` the returned array is also empty.
 
 """
 function states_atjumps(traj::Trajectory, sys::System,
-                      psi0::Union{Vector{ComplexF64}, Matrix{ComplexF64}}; normalize::Bool=true)
+    psi0::Union{Vector{ComplexF64},Matrix{ComplexF64}}; normalize::Bool=true)
     njumps = size(traj)[1]
     if isa(psi0, Vector{ComplexF64})
-        states = Array{ComplexF64}(undef, sys.NLEVELS,  njumps)
+        states = Array{ComplexF64}(undef, sys.NLEVELS, njumps)
     elseif isa(psi0, Matrix{ComplexF64})
         states = Array{ComplexF64}(undef, sys.NLEVELS, sys.NLEVELS, njumps)
     end
     psi = copy(psi0)
     jump_counter = 1
     for click in traj
-        prejumpupdate!(exp(-1im*(click.time)*sys.Heff), psi)
+        prejumpupdate!(exp(-1im * (click.time) * sys.Heff), psi)
         postjumpupdate!(sys.Ls[click.label], psi; normalize=normalize)
         writestate!(states, psi, jump_counter)
         jump_counter = jump_counter + 1
     end
     return states
 end
+
+# This one works with the times and labels as vectors
+function states_atjumps(jumptimes::Vector{T1}, labels::Vector{T2}, sys::System,
+    psi0::Vector{T3}; normalize::Bool=true) where {T1<:Real,T2<:Int,T3<:Complex}
+    # T3 = eltype(psi0)
+    njumps = length(jumptimes)
+    states = Array{T3}(undef, sys.NLEVELS, njumps)
+    psi = copy(psi0)
+    jump_counter = 1
+    for k in 1:njumps
+        prejumpupdate!(exp(-1im * (jumptimes[k]) * sys.Heff), psi)
+        postjumpupdate!(sys.Ls[labels[k]], psi; normalize=normalize)
+        writestate!(states, psi, jump_counter)
+        jump_counter = jump_counter + 1
+    end
+    return states
+end
+
+
+
+
 
 """
 ```
@@ -319,8 +340,8 @@ times in `t_given`. In case `isempty(t_given)=true` the returned array is also e
 
 """
 function states_att(t_given::Vector{Float64}, traj::Trajectory, sys::System,
-                       psi0::Union{Vector{ComplexF64}, Matrix{ComplexF64}};
-                       normalize::Bool=true)
+    psi0::Union{Vector{ComplexF64},Matrix{ComplexF64}};
+    normalize::Bool=true)
     # Special case: if the time array is empty, return an empty array
     if isempty(t_given)
         return Array{ComplexF64}(undef, 0, 0) # empty 2 dimensional array
@@ -334,15 +355,15 @@ function states_att(t_given::Vector{Float64}, traj::Trajectory, sys::System,
     counter_c = 1
     # states = Array{ComplexF64}(undef, sys.NLEVELS, ntimes)
     if isa(psi0, Vector{ComplexF64})
-        states = Array{ComplexF64}(undef, sys.NLEVELS,  ntimes)
+        states = Array{ComplexF64}(undef, sys.NLEVELS, ntimes)
     elseif isa(psi0, Matrix{ComplexF64})
         states = Array{ComplexF64}(undef, sys.NLEVELS, sys.NLEVELS, ntimes)
     end
     # Edge case: if the trajectory is empty, evaluate exponentials and return
     if isempty(traj)
         while counter <= ntimes
-            prejumpupdate!(psi, exp(-1im*(t_given[counter])*sys.Heff), psi0;
-                           normalize=normalize)
+            prejumpupdate!(psi, exp(-1im * (t_given[counter]) * sys.Heff), psi0;
+                normalize=normalize)
             # fixlastindex(states, counter)
             writestate!(states, psi, counter)
             counter = counter + 1
@@ -354,34 +375,34 @@ function states_att(t_given::Vector{Float64}, traj::Trajectory, sys::System,
     end
     # All the states before the first jump can be handled like this:
     while (t_given[counter] < traj[counter_c].time) && (counter <= ntimes)
-            prejumpupdate!(psi, exp(-1im*(t_given[counter])*sys.Heff), psi0;
-                           normalize=normalize)
-            writestate!(states, psi, counter)
-            counter = counter + 1
-            if counter > ntimes
-                break
-            end
+        prejumpupdate!(psi, exp(-1im * (t_given[counter]) * sys.Heff), psi0;
+            normalize=normalize)
+        writestate!(states, psi, counter)
+        counter = counter + 1
+        if counter > ntimes
+            break
+        end
     end
     t_ = t_ + traj[counter_c].time
     counter_c = counter_c + 1
     while (counter_c <= njumps) && (counter <= ntimes)
         timeclick = traj[counter_c].time
         while (t_ < t_given[counter] < t_ + timeclick) && (counter <= ntimes)
-             prejumpupdate!(psi, exp(-1im*(t_given[counter] - t_)*sys.Heff),
-                            fixlastindex(jump_states, counter_c-1); normalize=normalize)
-             writestate!(states, psi, counter)
-             counter = counter + 1
-             if counter > ntimes
-                 break
-             end
-         end
-       t_ = t_ + timeclick
-       counter_c = counter_c + 1
+            prejumpupdate!(psi, exp(-1im * (t_given[counter] - t_) * sys.Heff),
+                fixlastindex(jump_states, counter_c - 1); normalize=normalize)
+            writestate!(states, psi, counter)
+            counter = counter + 1
+            if counter > ntimes
+                break
+            end
+        end
+        t_ = t_ + timeclick
+        counter_c = counter_c + 1
     end
 
     while counter <= ntimes
-        prejumpupdate!(psi, exp(-1im*(t_given[counter] - t_)*sys.Heff),
-                       fixlastindex(jump_states, njumps); normalize=normalize)
+        prejumpupdate!(psi, exp(-1im * (t_given[counter] - t_) * sys.Heff),
+            fixlastindex(jump_states, njumps); normalize=normalize)
         writestate!(states, psi, counter)
         counter = counter + 1
     end

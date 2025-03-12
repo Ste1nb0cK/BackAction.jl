@@ -19,8 +19,8 @@ function getheff_parametrized(H_par::Function, Ls_par)::Function
     # here theta is expected to be a vector
     return (theta...) -> begin # Get an arbitrary number of arguments
         # The ... "splatts" the vector so it is passed as a tuple to the function
-        LLs_par = [ adjoint(L_par(theta...))*L_par(theta...) for L_par in Ls_par]
-        return H_par(theta...) - 0.5im*sum(LLs_par)
+        LLs_par = [adjoint(L_par(theta...)) * L_par(theta...) for L_par in Ls_par]
+        return H_par(theta...) - 0.5im * sum(LLs_par)
     end
 end
 
@@ -48,11 +48,11 @@ of the vector ``\\theta``.
     Preferably one in which  ``\\partial_i H_e`` commutes with ``H_e``, those are easier.
 """
 function expheff_derivative(Heff_par::Function, tau::Float64, theta::Vector{Float64}, dtheta::Vector{Float64})
-    f1 =  exp(-1im*tau*Heff_par((theta + 2*dtheta)...))
-    f2 =  exp(-1im*tau*Heff_par((theta + 1*dtheta)...))
-    f3 =  exp(-1im*tau*Heff_par((theta - 1*dtheta)...))
-    f4 =  exp(-1im*tau*Heff_par((theta - 2*dtheta)...))
-    return (-f1 + 8*f2 - 8*f3 + f4 )/(12*norm(dtheta))
+    f1 = exp(-1im * tau * Heff_par((theta + 2 * dtheta)...))
+    f2 = exp(-1im * tau * Heff_par((theta + 1 * dtheta)...))
+    f3 = exp(-1im * tau * Heff_par((theta - 1 * dtheta)...))
+    f4 = exp(-1im * tau * Heff_par((theta - 2 * dtheta)...))
+    return (-f1 + 8 * f2 - 8 * f3 + f4) / (12 * norm(dtheta))
 end
 
 
@@ -79,11 +79,11 @@ function jumpoperators_derivatives(Ls_par, theta::Vector{Float64}, dtheta::Vecto
     nlevels = size(Ls_par[1](theta...))[1]
     dLs = zeros(ComplexF64, nlevels, nlevels, nchannels)
     for k in 1:nchannels
-        f1 = Ls_par[k]((theta + 2*dtheta)...)
-        f2 = Ls_par[k]((theta+dtheta)...)
-        f3 = Ls_par[k]((theta-dtheta)...)
-        f4 = Ls_par[k]((theta-2*dtheta)...)
-        dLs[:, :, k] = (-f1 + 8*f2 - 8*f3 + f4 )/(12*norm(dtheta))
+        f1 = Ls_par[k]((theta + 2 * dtheta)...)
+        f2 = Ls_par[k]((theta + dtheta)...)
+        f3 = Ls_par[k]((theta - dtheta)...)
+        f4 = Ls_par[k]((theta - 2 * dtheta)...)
+        dLs[:, :, k] = (-f1 + 8 * f2 - 8 * f3 + f4) / (12 * norm(dtheta))
     end
     return dLs
 end
@@ -106,12 +106,12 @@ must be provided via `dL` and `dV`.
 !!! note "Initial State dependency"
     This is intended to be used when ``|\\psi_0\\rangle`` doesn't have dependeny on ``\\theta``.
 """
-function writederivative!(dpsi::SubArray{ComplexF64, 1},
-                          L::Matrix{ComplexF64},
-                          dL::SubArray{ComplexF64, 2},
-                          V::Matrix{ComplexF64}, dV::Matrix{ComplexF64},
-                          psi0::Vector{ComplexF64})
-    dpsi .= (dL*V + L*dV)*psi0
+function writederivative!(dpsi::SubArray{ComplexF64,1},
+    L::Matrix{ComplexF64},
+    dL::SubArray{ComplexF64,2},
+    V::Matrix{ComplexF64}, dV::Matrix{ComplexF64},
+    psi0::Vector{ComplexF64})
+    dpsi .= (dL * V + L * dV) * psi0
 end
 
 """
@@ -132,13 +132,13 @@ must be provided via `dL` and `dV`, and also that of ``|\\psi(0)\\rangle`` as `d
 
 
 """
-function writederivative!(dpsi::SubArray{ComplexF64, 1},
-                          L::Matrix{ComplexF64},
-                          dL::SubArray{ComplexF64, 2},
-                          V::Matrix{ComplexF64}, dV::Matrix{ComplexF64},
-                          psi0::SubArray{ComplexF64, 1},#Union{Vector{ComplexF64}, SubArray{ComplexF64}},
-                          dpsi0::SubArray{ComplexF64, 1})
-    dpsi .= (dL*V + L*dV)*psi0 + L*V*dpsi0
+function writederivative!(dpsi::SubArray{ComplexF64,1},
+    L::Matrix{ComplexF64},
+    dL::SubArray{ComplexF64,2},
+    V::Matrix{ComplexF64}, dV::Matrix{ComplexF64},
+    psi0::SubArray{ComplexF64,1},#Union{Vector{ComplexF64}, SubArray{ComplexF64}},
+    dpsi0::SubArray{ComplexF64,1})
+    dpsi .= (dL * V + L * dV) * psi0 + L * V * dpsi0
 end
 
 """
@@ -163,17 +163,17 @@ is the state just after the ``n-th`` jump in the trajectory. They are returned a
                              respect to the ``i-th`` parameter `dtheta` must have zero entries except for `dtheta[i]`.
 
 !!! note "Derivative order "
-    The derivative is calculate using the five-point stencil rule.
+    The derivative is calculated using the five-point stencil rule.
 """
 function derivatives_atjumps(sys::System, Heff_par::Function, Ls_par, traj::Trajectory, psi0::Vector{ComplexF64}, theta::Vector{Float64},
-                            dtheta::Vector{Float64})
+    dtheta::Vector{Float64})
     # 0. Special Case: if the trajectory is empty, return an empty array
     if isempty(traj)
         return Array{ComplexF64}(undef, 0, 0)
     end
     # 1. Get the derivatives of L
     dLs = jumpoperators_derivatives(Ls_par, theta, dtheta)
-   # 2.1 Setup
+    # 2.1 Setup
     njumps = size(traj)[1]
     dpsis = zeros(ComplexF64, sys.NLEVELS, njumps)
     # 2.2 Set up the first jump
@@ -181,27 +181,27 @@ function derivatives_atjumps(sys::System, Heff_par::Function, Ls_par, traj::Traj
     label = click.label
     tau = click.time
     writederivative!(fixlastindex(dpsis, 1),
-                     sys.Ls[label], fixlastindex(dLs, label),
-                     exp(-1im*tau*sys.Heff),
-                     expheff_derivative(Heff_par, tau, theta, dtheta), psi0)
+        sys.Ls[label], fixlastindex(dLs, label),
+        exp(-1im * tau * sys.Heff),
+        expheff_derivative(Heff_par, tau, theta, dtheta), psi0)
     # In case there are no more jumps, return
-    if njumps  == 1
+    if njumps == 1
         return dpsis
     end
     # 3. Go over the rest of the jumps
     psitildes = states_atjumps(traj, sys, psi0; normalize=false)
     for k in 2:njumps
-      click = traj[k]
-      label = click.label
-      tau = click.time
-      # Calculate the derivative
-      writederivative!(fixlastindex(dpsis, k),
-                         sys.Ls[label], fixlastindex(dLs, label),
-                         exp(-1im*tau*sys.Heff),
-                         expheff_derivative(Heff_par, tau, theta, dtheta),
-                         fixlastindex(psitildes, k-1), fixlastindex(dpsis, k-1))
-   end
-   return dpsis
+        click = traj[k]
+        label = click.label
+        tau = click.time
+        # Calculate the derivative
+        writederivative!(fixlastindex(dpsis, k),
+            sys.Ls[label], fixlastindex(dLs, label),
+            exp(-1im * tau * sys.Heff),
+            expheff_derivative(Heff_par, tau, theta, dtheta),
+            fixlastindex(psitildes, k - 1), fixlastindex(dpsis, k - 1))
+    end
+    return dpsis
 
 end
 
@@ -215,9 +215,9 @@ Calculate the monitoring operator when ``|\\psi(\\theta)\\rangle = V|\\psi_0\\ra
 depend on ``\\theta``, and write it at the `SubArray` `xi`. This is, calculate
 ``d|\\psi(\\theta)\\rangle = dV|\\psi_0\\rangle``.
 """
-function writexi!(xi::SubArray{ComplexF64, 2}, dV::Matrix{ComplexF64},
-                  psi::SubArray{ComplexF64, 1}, psi0::Vector{ComplexF64})
-    xi .= ((dV*psi0).*adjoint(psi)+psi.*adjoint(dV*psi0))/dot(psi, psi)
+function writexi!(xi::SubArray{ComplexF64,2}, dV::Matrix{ComplexF64},
+    psi::SubArray{ComplexF64,1}, psi0::Vector{ComplexF64})
+    xi .= ((dV * psi0) .* adjoint(psi) + psi .* adjoint(dV * psi0)) / dot(psi, psi)
 end
 
 """
@@ -232,10 +232,10 @@ Calculate the monitoring operator when ``|\\psi(\\theta)\\rangle = V|\\psi_N\\ra
 a state that depends on ``\\theta``, the result is written at the `SubArray` `xi`. This is, calculate
 ``d|\\psi(\\theta)\\rangle = dV|\\psi_N\\rangle + Vd|\\psi_N\\rangle ``.
 """
-function writexi!(xi::SubArray{ComplexF64, 2}, V::Matrix{ComplexF64}, dV::Matrix{ComplexF64},
-                   psijump::SubArray{ComplexF64, 1}, dpsijump::SubArray{ComplexF64, 1},
-                  psi::SubArray{ComplexF64, 1})
-    xi .= ((dV*psijump + V*dpsijump).*adjoint(psi)+psi.*adjoint(dV*psijump + V*dpsijump))/dot(psi, psi)
+function writexi!(xi::SubArray{ComplexF64,2}, V::Matrix{ComplexF64}, dV::Matrix{ComplexF64},
+    psijump::SubArray{ComplexF64,1}, dpsijump::SubArray{ComplexF64,1},
+    psi::SubArray{ComplexF64,1})
+    xi .= ((dV * psijump + V * dpsijump) .* adjoint(psi) + psi .* adjoint(dV * psijump + V * dpsijump)) / dot(psi, psi)
 end
 
 
@@ -253,7 +253,7 @@ so to access it at the time `t` you would do
 """
 function monitoringoperator(t_given::Vector{Float64},
     sys::System, Heff_par::Function, Ls_par, traj::Trajectory, psi0::Vector{ComplexF64}, theta::Vector{Float64},
-                            dtheta::Vector{Float64})
+    dtheta::Vector{Float64})
 
     # Special case: if the time array is empty, return an empty array
     if isempty(t_given)
@@ -270,8 +270,8 @@ function monitoringoperator(t_given::Vector{Float64},
     if isempty(traj)
         while counter <= ntimes
             writexi!(fixlastindex(xis, counter),
-                     expheff_derivative(Heff_par, t_given[counter], theta, dtheta),
-                     fixlastindex(psi, counter), psi0)
+                expheff_derivative(Heff_par, t_given[counter], theta, dtheta),
+                fixlastindex(psi, counter), psi0)
             counter = counter + 1
             if counter > ntimes
                 break
@@ -281,13 +281,13 @@ function monitoringoperator(t_given::Vector{Float64},
     end
     # Evaluations before first jump
     while (t_given[counter] < traj[counter_c].time) && (counter <= ntimes)
-             writexi!(fixlastindex(xis, counter),
-                     expheff_derivative(Heff_par, t_given[counter], theta, dtheta),
-                     fixlastindex(psi, counter), psi0)
-            counter = counter + 1
-            if counter > ntimes
-                break
-            end
+        writexi!(fixlastindex(xis, counter),
+            expheff_derivative(Heff_par, t_given[counter], theta, dtheta),
+            fixlastindex(psi, counter), psi0)
+        counter = counter + 1
+        if counter > ntimes
+            break
+        end
     end
     dpsijumps = derivatives_atjumps(sys, Heff_par, Ls_par, traj, psi0, theta, dtheta)
     psijumps = states_atjumps(traj, sys, psi0; normalize=false)
@@ -297,24 +297,24 @@ function monitoringoperator(t_given::Vector{Float64},
     while (counter_c <= njumps) && (counter <= ntimes)
         timeclick = traj[counter_c].time
         while (t_ < t_given[counter] < t_ + timeclick) && (counter <= ntimes)
-            writexi!(fixlastindex(xis, counter), exp(-1im*(t_given[counter]-t_)*sys.Heff),
-                     expheff_derivative(Heff_par, t_given[counter]-t_, theta, dtheta),
-                     fixlastindex(psijumps, counter_c-1), fixlastindex(dpsijumps, counter_c-1),
-                     fixlastindex(psi, counter))
+            writexi!(fixlastindex(xis, counter), exp(-1im * (t_given[counter] - t_) * sys.Heff),
+                expheff_derivative(Heff_par, t_given[counter] - t_, theta, dtheta),
+                fixlastindex(psijumps, counter_c - 1), fixlastindex(dpsijumps, counter_c - 1),
+                fixlastindex(psi, counter))
             counter = counter + 1
             if counter > ntimes
                 break
             end
-         end
-       t_ = t_ + timeclick
-       counter_c = counter_c + 1
+        end
+        t_ = t_ + timeclick
+        counter_c = counter_c + 1
     end
 
     while counter <= ntimes
-        writexi!(fixlastindex(xis, counter), exp(-1im*(t_given[counter]-t_)*sys.Heff),
-                     expheff_derivative(Heff_par, t_given[counter]-t_, theta, dtheta),
-                     fixlastindex(psijumps, njumps), fixlastindex(dpsijumps, njumps),
-                     fixlastindex(psi, counter))
+        writexi!(fixlastindex(xis, counter), exp(-1im * (t_given[counter] - t_) * sys.Heff),
+            expheff_derivative(Heff_par, t_given[counter] - t_, theta, dtheta),
+            fixlastindex(psijumps, njumps), fixlastindex(dpsijumps, njumps),
+            fixlastindex(psi, counter))
 
         counter = counter + 1
     end

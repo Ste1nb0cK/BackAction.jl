@@ -99,7 +99,7 @@ end
 ################ Data Point ################
 """
 
-    DetectionClick(time::Float64, label::Int64)
+DetectionClick(time::T1, label::T2){T1<:Real, T2<:Int}
 `Inmutable struct` that represents the clicks by the time waited to see the click and the
 label of the channel in which it occured.
 
@@ -107,9 +107,9 @@ label of the channel in which it occured.
 - `time::Float64`: Waiting time
 - `label::Int64`: Label of the channel of the click
  """
-struct DetectionClick
-    time::Float64
-    label::Int64
+struct DetectionClick{T1<:Real, T2<:Int}
+    time::T1
+    label::T2
 end
 
 @doc "Alias for `Vector{DetectionClick}`"

@@ -37,12 +37,12 @@ random numbers and applying the jump update rule.
 
 """
 struct _LindbladJump{T1<:Complex,
-                     T2<:Real, #type of the effective hamiltonian
-                    RNGType<:Xoshiro, # type of the RNG
-                    T3<:Ref{Float64}, # type of the random vector one uses to sample
+    T2<:Real, #type of the effective hamiltonian
+    RNGType<:Xoshiro, # type of the RNG
+    T3<:Ref{Float64}, # type of the random vector one uses to sample
     T4<:Int, # channel labels vector
     JCT<:Ref{Int64}, # jump counter
-    }
+}
     Ls::Vector{Matrix{T1}}# Jump operators
     LLs::Vector{Matrix{T1}} # Products of the jump operators
     Heff::Matrix{T1} # Effective Hamiltonian
@@ -139,7 +139,7 @@ For more information on `callbacks` see the documentation in DifferentialEquatio
 """
 function (f::_LindbladJump)(integrator)
     _lindblad_jump_affect!(integrator, f.Ls, f.LLs, f.Heff, f.rng, f.r, f.weights,
-                           f.cumsum, f.cache_state, f.jump_times, f.jump_channels, f.jump_counter )
+        f.cumsum, f.cache_state, f.jump_times, f.jump_channels, f.jump_counter)
 end
 
 """
@@ -152,21 +152,22 @@ Create a callback to perform jump updates in the MCW method, appropiate for the 
 `params` is used to provide the seed and the initial state, while `t_eval` for infering
 the type of the `weights` and `cumsum`.
 """
-function _create_callback(sys::System, params::SimulParameters, t_eval::Vector{T1}, rng::Xoshiro) where {T1<:Real }
+function _create_callback(sys::System, params::SimulParameters, tspan::Tuple{T1,T1}, rng::Xoshiro) where {T1<:Real}
+    ttype = typeof(tspan[1])
     Random.seed!(rng, params.seed)
     _jump_affect! = _LindbladJump(
-            sys.Ls,
-            sys.LLs,
-            sys.Heff,
-            rng,
-            Ref{Float64}(rand(rng)),
-            similar(t_eval, sys.NCHANNELS),
-            similar(t_eval, sys.NCHANNELS),
-            similar(params.psi0),
+        sys.Ls,
+        sys.LLs,
+        sys.Heff,
+        rng,
+        Ref{Float64}(rand(rng)),
+        Vector{ttype}(undef, sys.NCHANNELS),
+        Vector{ttype}(undef, sys.NCHANNELS),
+        similar(params.psi0),
         Vector{Float64}(undef, JUMP_TIMES_INIT_SIZE),
         Vector{Int64}(undef, JUMP_TIMES_INIT_SIZE),
         Ref{Int64}(1)
-        )
+    )
 
     function condition(u, t, integrator)
         real(dot(u, u)) - _jump_affect!.r[]
@@ -185,18 +186,18 @@ The initial condition and seed are passed via `params`, while `t_eval` sets the 
 solver should save the solution.
 """
 function _generate_trajectoryproblem_jumps(sys::System, params::SimulParameters,
-                                           t_eval::Vector{Float64}; kwargs... )::ODEProblem
+    tspan::Tuple{T2,T2}; kwargs...)::ODEProblem where {T2<:Real}
     function f!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p, t)
-        du.= -1im*sys.Heff*u
+        du .= -1im * sys.Heff * u
     end
-    t0, tf = extrema(t_eval)
-    tspan = (t0, tf)
     # create the LindbladJump that will hold the affect!
     rng = Random.Xoshiro()
-    cb = _create_callback(sys, params, t_eval, rng)
+    cb = _create_callback(sys, params, tspan, rng)
 
-    return ODEProblem{true}(f!, params.psi0, tspan; callback = cb , saveat=t_eval, kwargs...)
+    # return ODEProblem{true}(f!, params.psi0, tspan; callback=cb, saveat=t_eval, kwargs...)
+    return ODEProblem{true}(f!, params.psi0, tspan; callback=cb, kwargs...)
 end
+
 
 """
 ```
@@ -216,7 +217,7 @@ function _prob_func_jumps(prob, i, repeat)
     end
     cb = ContinuousCallback(condition, _jump_affect!)
     f = deepcopy(prob.f.f)
-    return remake(prob, f = f, callback = cb)
+    return remake(prob, f=f, callback=cb)
 end
 
 """
@@ -227,9 +228,9 @@ Initialize an ensemble ODEProblem from the given `System`. The initial
 state for all the trajectories is assumed to be the same, and the seed is set
 according to `params`.
 """
-function _get_ensemble_problem_jumps(sys, params, t_eval; kwargs...)
-    prob_sys = _generate_trajectoryproblem_jumps(sys, params, t_eval; kwargs...)
-    return EnsembleProblem(prob_sys, prob_func = _prob_func_jumps, output_func = _output_func)
+function _get_ensemble_problem_jumps(sys, params, tspan; kwargs...)
+    prob_sys = _generate_trajectoryproblem_jumps(sys, params, tspan; kwargs...)
+    return EnsembleProblem(prob_sys, prob_func=_prob_func_jumps, output_func=_output_func, safetycopy=false)
 end
 
 
@@ -252,11 +253,11 @@ will store the states are defined by `t_eval`. Additionally, you can choose the
 algorithm for the solver via `alg` and `ensemblealg`, and  even pass any valid
 `keyword argument` valid in `DifferentialEquations.jl` through `kwargs`
 """
-function get_sol_jumps(sys::System, params::SimulParameters, t_eval::Vector{T}, alg=Tsit5(), ensemblealg=EnsembleThreads();
-                        kwargs...) where T<:Real
+function get_sol_jumps(sys::System, params::SimulParameters, tspan::Tuple{T,T}, alg=Tsit5(), ensemblealg=EnsembleThreads();
+    kwargs...) where {T<:Real}
     # set the ensemble problem
-    ensemble_prob = _get_ensemble_problem_jumps(sys, params, t_eval;  kwargs...)
-    return solve(ensemble_prob, alg, ensemblealg; trajectories=params.ntraj);
+    ensemble_prob = _get_ensemble_problem_jumps(sys, params, tspan; kwargs...)
+    return solve(ensemble_prob, alg, ensemblealg; trajectories=params.ntraj)
 end
 
 
