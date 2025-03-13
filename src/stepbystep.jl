@@ -10,6 +10,10 @@
 
 # @docs " Number of maximum number of jumps that's initially expected to be stored"
 const JUMP_TIMES_INIT_SIZE::Int64 = 200
+
+# This avoids DifferentialEquations trying to deepcopy an anonymous function when 
+# creating the new problems
+# Overload the struct to use it as the ODEFunction in the problems
 """
 ```
 
@@ -182,8 +186,8 @@ solver should save the solution.
 """
 function _generate_trajectoryproblem_jumps(sys::System, params::SimulParameters,
                                            t_eval::Vector{Float64}; kwargs... )::ODEProblem
-    function f!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p::Nothing, t::Nothing)
-        return -1im*sys.Heff*u
+    function f!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p, t)
+        du.= -1im*sys.Heff*u
     end
     t0, tf = extrema(t_eval)
     tspan = (t0, tf)
@@ -248,10 +252,10 @@ will store the states are defined by `t_eval`. Additionally, you can choose the
 algorithm for the solver via `alg` and `ensemblealg`, and  even pass any valid
 `keyword argument` valid in `DifferentialEquations.jl` through `kwargs`
 """
-function get_sol_jumps(sys, params, t_eval, alg=Tsit5(), ensemblealg=EnsembleThreads();
-                        kwargs...)
+function get_sol_jumps(sys::System, params::SimulParameters, t_eval::Vector{T}, alg=Tsit5(), ensemblealg=EnsembleThreads();
+                        kwargs...) where T<:Real
     # set the ensemble problem
-    ensemble_prob = _get_ensemble_problem_jumps(sys, params, t_eval;   kwargs...)
+    ensemble_prob = _get_ensemble_problem_jumps(sys, params, t_eval;  kwargs...)
     return solve(ensemble_prob, alg, ensemblealg; trajectories=params.ntraj);
 end
 
