@@ -147,23 +147,23 @@ For the Gillipsie algorithm to work it's key to have a grid that's capable of
 resolving the statistical details of the WTD, this grid is taken in the interval
 `(0, tf*multiplier)`.
 """
-struct SimulParameters{T<:Union{Vector{ComplexF64}, Matrix{ComplexF64}}}
-    psi0::T
-    nsamples::Int64 # Number of samples in the finegrid
-    seed::Int64 # seed
-    ntraj::Int64 # Number of trajectories
-    multiplier::Float64 # Multiplier to use in the fine grid
-    tf::Float64 # Final time
-    dt::Float64 # time step for the finegrid
-    eps::Float64 # Tolerance for passing WTD normalziation
+struct SimulParameters{T1<:Complex, T2<:Real, T3<:Int}
+    psi0::Vector{T1}
+    nsamples::T3 # Number of samples in the finegrid
+    seed::T3 # seed
+    ntraj::T3 # Number of trajectories
+    multiplier::T2 # Multiplier to use in the fine grid
+    tf::T2 # Final time
+    dt::T2 # time step for the finegrid
+    eps::T2 # Tolerance for passing WTD normalziation
     @doc "Inner constructor of `SimulParameters` SimulParameters(psi0::Vector{ComplexF64}, tf::Float64,
         s::Int64, ntraj::Int64, nsamples::Int64=10000, m::Float64=10.0,
                              eps::Float64=1e-3)"
-    function SimulParameters(psi0::T, tf::Float64,
-        s::Int64, ntraj::Int64, nsamples::Int64=10000, m::Float64=10.0,
-                             eps::Float64=1e-3) where T<:Union{Vector{ComplexF64}, Matrix{ComplexF64}}
+    function SimulParameters(psi0::Union{Vector{T1}, Matrix{T1}}, tf::T2,
+                             s::T3, ntraj::T3, nsamples::T3=10000, m::T2=10.0,
+                             eps::T2=1e-3) where {T1<:Complex, T2<:Real, T3<:Int}
         deltat = m*tf/nsamples
-        new{T}(psi0, nsamples, s, ntraj, m, tf, deltat, eps)
+        new{T1, T2, T3}(psi0, nsamples, s, ntraj, m, tf, deltat, eps)
     end
 end
 Base.show(io::IO, s::SimulParameters) = print(io,

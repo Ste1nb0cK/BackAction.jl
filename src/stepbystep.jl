@@ -148,23 +148,20 @@ Create a callback to perform jump updates in the MCW method, appropiate for the 
 `params` is used to provide the seed and the initial state, while `t_eval` for infering
 the type of the `weights` and `cumsum`.
 """
-function _create_callback(sys::System, params::SimulParameters, t_eval::Vector{Float64}, rng::AbstractRNG)
-    # rng = Random.Xoshiro()
-    # println(typeof(rng))
-    rng = rng isa Type ? rng() : rng
+function _create_callback(sys::System, params::SimulParameters, t_eval::Vector{T1}, rng::Xoshiro) where {T1<:Real }
     Random.seed!(rng, params.seed)
     _jump_affect! = _LindbladJump(
             sys.Ls,
             sys.LLs,
             sys.Heff,
             rng,
-            Ref(rand(rng)),
+            Ref{Float64}(rand(rng)),
             similar(t_eval, sys.NCHANNELS),
             similar(t_eval, sys.NCHANNELS),
             similar(params.psi0),
         Vector{Float64}(undef, JUMP_TIMES_INIT_SIZE),
-        Vector{Int}(undef, JUMP_TIMES_INIT_SIZE),
-        Ref(1)
+        Vector{Int64}(undef, JUMP_TIMES_INIT_SIZE),
+        Ref{Int64}(1)
         )
 
     function condition(u, t, integrator)
@@ -251,7 +248,7 @@ will store the states are defined by `t_eval`. Additionally, you can choose the
 algorithm for the solver via `alg` and `ensemblealg`, and  even pass any valid
 `keyword argument` valid in `DifferentialEquations.jl` through `kwargs`
 """
-function get_sol_jumps(sys, params, t_eval, alg=nothing, ensemblealg=EnsembleThreads();
+function get_sol_jumps(sys, params, t_eval, alg=Tsit5(), ensemblealg=EnsembleThreads();
                         kwargs...)
     # set the ensemble problem
     ensemble_prob = _get_ensemble_problem_jumps(sys, params, t_eval;   kwargs...)
