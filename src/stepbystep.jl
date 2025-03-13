@@ -172,7 +172,7 @@ function _create_callback(sys::System, params::SimulParameters, tspan::Tuple{T1,
     function condition(u, t, integrator)
         real(dot(u, u)) - _jump_affect!.r[]
     end
-    return ContinuousCallback(condition, _jump_affect!; save_positions=(false, false))
+    return ContinuousCallback(condition, _jump_affect!; save_positions=(true, true))
 end
 
 """
