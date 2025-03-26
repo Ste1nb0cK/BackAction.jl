@@ -184,7 +184,8 @@ Generate a ODEProblem for the given `System`, corresponding to a single trajecto
 The initial condition and seed are passed via `params`, while `t_eval` sets the points at which the
 solver should save the solution.
 """
-function _generate_trajectoryproblem_jumps(sys::System, params::SimulParameters, t_eval::AbstractVector; kwargs... )
+function _generate_trajectoryproblem_jumps(sys::System, params::SimulParameters,
+                                           t_eval::AbstractVector; kwargs... )
 
     function f!(u, p, t)
         return -1im*sys.Heff*u
@@ -233,11 +234,11 @@ function _get_ensemble_problem_jumps(sys, params, t_eval; kwargs...)
 end
 
 
-# simply resize the vectors
+# Resize the vectors and make them have the waiting time instead of the global time
 function _output_func(sol, i)
     idx = sol.prob.kwargs[:callback].affect!.jump_counter[]
-    resize!(sol.prob.kwargs[:callback].affect!.jump_times, idx - 1)
     resize!(sol.prob.kwargs[:callback].affect!.jump_channels, idx - 1)
+    resize!(sol.prob.kwargs[:callback].affect!.jump_times, idx - 1)
     return (sol, false)
 end
 
