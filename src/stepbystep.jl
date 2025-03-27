@@ -9,7 +9,7 @@
 # https://docs.sciml.ai/DiffEqDocs/stable/features/ensemble/
 
 # @docs " Number of maximum number of jumps that's initially expected to be stored"
-const JUMP_TIMES_INIT_SIZE = 200
+const JUMP_TIMES_INIT_SIZE::Int64 = 200
 """
 ```
 
@@ -32,27 +32,24 @@ random numbers and applying the jump update rule.
 
 
 """
-struct _LindbladJump{T1, #type of the list of jump operators
-                    T2, #type of the effective hamiltonian
-                    RNGType<:AbstractRNG, # type of the RNG
-                    T3, # type of the random vector one uses to sample
-                    WVType<:AbstractVector, # Weights Vector type
-                    SVType<:AbstractVector, # State Vector type
-                      JTV<:AbstractVector, # jump times vector
-    CVT<:AbstractVector, # channel labels vector
-    JCT, # jump counter
+struct _LindbladJump{T1<:Complex,
+                     T2<:Real, #type of the effective hamiltonian
+                    RNGType<:Xoshiro, # type of the RNG
+                    T3<:Ref{Float64}, # type of the random vector one uses to sample
+    T4<:Int, # channel labels vector
+    JCT<:Ref{Int64}, # jump counter
     }
-    Ls::T1 # Jump operators
-    LLs::T1 # Products of the jump operators
-    Heff::T2 # Effective Hamiltonian
+    Ls::Vector{Matrix{T1}}# Jump operators
+    LLs::Vector{Matrix{T1}} # Products of the jump operators
+    Heff::Matrix{T1} # Effective Hamiltonian
     rng::RNGType # Random number generator
     r::T3 # Random number for sampling, this is inteded to be a Ref
     # Next stuff is for convenience in doing the jump update, here we basically preallocate memory for it
-    weights::WVType
-    cumsum::WVType
-    cache_state::SVType
-    jump_times::JTV
-    jump_channels::CVT
+    weights::Vector{T2}
+    cumsum::Vector{T2}
+    cache_state::Vector{T1}
+    jump_times::Vector{T2}
+    jump_channels::Vector{T4}
     jump_counter::JCT
 
 end
@@ -151,8 +148,10 @@ Create a callback to perform jump updates in the MCW method, appropiate for the 
 `params` is used to provide the seed and the initial state, while `t_eval` for infering
 the type of the `weights` and `cumsum`.
 """
-function _create_callback(sys::System, params::SimulParameters, t_eval::AbstractVector, rng)
-    rng = Random.default_rng()
+function _create_callback(sys::System, params::SimulParameters, t_eval::Vector{Float64}, rng::AbstractRNG)
+    # rng = Random.Xoshiro()
+    # println(typeof(rng))
+    rng = rng isa Type ? rng() : rng
     Random.seed!(rng, params.seed)
     _jump_affect! = _LindbladJump(
             sys.Ls,
@@ -185,18 +184,17 @@ The initial condition and seed are passed via `params`, while `t_eval` sets the 
 solver should save the solution.
 """
 function _generate_trajectoryproblem_jumps(sys::System, params::SimulParameters,
-                                           t_eval::AbstractVector; kwargs... )
-
-    function f!(u, p, t)
+                                           t_eval::Vector{Float64}; kwargs... )::ODEProblem
+    function f!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p::Nothing, t::Nothing)
         return -1im*sys.Heff*u
     end
     t0, tf = extrema(t_eval)
     tspan = (t0, tf)
     # create the LindbladJump that will hold the affect!
-    rng = Random.default_rng()
+    rng = Random.Xoshiro()
     cb = _create_callback(sys, params, t_eval, rng)
 
-    return ODEProblem(f!, params.psi0, tspan; callback = cb , saveat=t_eval, kwargs...)
+    return ODEProblem{true}(f!, params.psi0, tspan; callback = cb , saveat=t_eval, kwargs...)
 end
 
 """
@@ -208,7 +206,7 @@ used in the initialization of an ensemble problem, see: https://docs.sciml.ai/Di
 """
 function _prob_func_jumps(prob, i, repeat)
     # First, initialize a new RNG with the corresponding seed
-    rng = Random.MersenneTwister()
+    rng = Random.Xoshiro()
     Random.seed!(rng, i)
     affect0! = prob.kwargs[:callback].affect!
     _jump_affect! = _similar_affect!(affect0!, rng)

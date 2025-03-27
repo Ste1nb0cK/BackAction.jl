@@ -24,14 +24,14 @@ To create an instance it's enough to provide the hamiltonian and the jump operat
 `System(H::Matrix{ComplexF64}, Ls::Vector{Matrix{ComplexF64}})`
 
 """
-struct System
+struct System{T1<:Complex}
     NLEVELS::Int64 # Number of levels of the system
     NCHANNELS::Int64 # Number of jump channels
-    H::Matrix{ComplexF64} # Hamiltonian
-    Ls::Vector{Matrix{ComplexF64}} # List of jump operators
-    LLs::Vector{Matrix{ComplexF64}} # List of L^\daggerL
-    J::Matrix{ComplexF64} # Sum of Jump operators
-    Heff::Matrix{ComplexF64} # Effective Hamiltonian
+    H::Matrix{T1} # Hamiltonian
+    Ls::Vector{Matrix{T1}} # List of jump operators
+    LLs::Vector{Matrix{T1}} # List of L^\daggerL
+    J::Matrix{T1} # Sum of Jump operators
+    Heff::Matrix{T1} # Effective Hamiltonian
 
     @doc "
          Inner Constructor of `System` struct.
@@ -39,31 +39,31 @@ struct System
          `H::Matrix{ComplexF64}`
          `Ls::Vector{Matrix{ComplexF64}}`
 "
-   function System(H::Matrix{ComplexF64}, Ls::Vector{Matrix{ComplexF64}})
+   function System(H::Matrix{T1}, Ls::Vector{Matrix{T1}}) where T1<:Complex
         NLEVELS = size(H)[1]
         NCHANNELS = size(Ls)[1] # Number of jump channels
-        J = zeros(ComplexF64, NLEVELS, NLEVELS)
-        LLs = Vector{Matrix{ComplexF64}}(undef, NCHANNELS)
+        J = zeros(T1, NLEVELS, NLEVELS)
+        LLs = Vector{Matrix{T1}}(undef, NCHANNELS)
         for k in 1:NCHANNELS
             product = adjoint(Ls[k])*Ls[k]
             J = J + product
             LLs[k] = product
         end
        He = H - 0.5im*J
-       new(NLEVELS, NCHANNELS, H, Ls, LLs, J, He)
+       new{T1}(NLEVELS, NCHANNELS, H, Ls, LLs, J, He)
     end
     "
         Constructor that allows specifying the alphas and the T's.
         The dimension of T must be Nxk, where k=lenght(Ls) but N might be arbitrary.
         It is expected for T to be unitary
     "
-    function  System(H::Matrix{ComplexF64}, Ls::Vector{Matrix{ComplexF64}},
-                     T::Matrix{ComplexF64}, alphas::Vector{ComplexF64})
+    function  System(H::Matrix{T1}, Ls::Vector{Matrix{T1}},
+                     T::Matrix{T1}, alphas::Vector{T1}) where T1<:Complex
         NLEVELS = size(H)[1]
         NCHANNELS = size(T)[1] # Number of jump channels
         k = length(Ls) # number of original jump operators
         # To set th
-        J = zeros(ComplexF64, NLEVELS, NLEVELS)
+        J = zeros(T1, NLEVELS, NLEVELS)
         H_ = copy(H)
         # unitary mixing
         Lprimes = [sum(T[i, j] * Ls[j] for j in 1:k) for i in 1:NCHANNELS]
@@ -74,20 +74,26 @@ struct System
         end
 
         #  set the effective hamiltonian
-        LLs = Vector{Matrix{ComplexF64}}(undef, NCHANNELS)
-        J = zeros(ComplexF64, NLEVELS, NLEVELS)
+        LLs = Vector{Matrix{T1}}(undef, NCHANNELS)
+        J = zeros(T1, NLEVELS, NLEVELS)
         for k in 1:NCHANNELS
             product = adjoint(Lprimes[k])*Lprimes[k]
             J = J + product
             LLs[k] = product
         end
         He = H_ - 0.5im*J
-        new(NLEVELS, NCHANNELS, H_, Lprimes, LLs, J, He)
+        new{T1}(NLEVELS, NCHANNELS, H_, Lprimes, LLs, J, He)
     end
 
 end
 Base.show(io::IO, s::System) = print(io,
     "System(NLEVELS=$(s.NLEVELS)\nNCHANNELS=$(s.NCHANNELS)\nH=$(s.H)\nLs=$(s.Ls)\nJ=$(s.J))\nHeff=$(s.Heff))")
+function Base.deepcopy(sys::System{T}) where {T<:ComplexF64}
+    return System(
+        deepcopy(sys.H),
+        [deepcopy(L) for L in sys.Ls]  # Ensures elements are fully copied
+    )
+end
 
 
 ################ Data Point ################
@@ -141,8 +147,8 @@ For the Gillipsie algorithm to work it's key to have a grid that's capable of
 resolving the statistical details of the WTD, this grid is taken in the interval
 `(0, tf*multiplier)`.
 """
-struct SimulParameters
-    psi0::Array{ComplexF64}
+struct SimulParameters{T<:Union{Vector{ComplexF64}, Matrix{ComplexF64}}}
+    psi0::T
     nsamples::Int64 # Number of samples in the finegrid
     seed::Int64 # seed
     ntraj::Int64 # Number of trajectories
@@ -153,11 +159,11 @@ struct SimulParameters
     @doc "Inner constructor of `SimulParameters` SimulParameters(psi0::Vector{ComplexF64}, tf::Float64,
         s::Int64, ntraj::Int64, nsamples::Int64=10000, m::Float64=10.0,
                              eps::Float64=1e-3)"
-    function SimulParameters(psi0::Array{ComplexF64}, tf::Float64,
+    function SimulParameters(psi0::T, tf::Float64,
         s::Int64, ntraj::Int64, nsamples::Int64=10000, m::Float64=10.0,
-                             eps::Float64=1e-3)
+                             eps::Float64=1e-3) where T<:Union{Vector{ComplexF64}, Matrix{ComplexF64}}
         deltat = m*tf/nsamples
-        new(psi0, nsamples, s, ntraj, m, tf, deltat, eps)
+        new{T}(psi0, nsamples, s, ntraj, m, tf, deltat, eps)
     end
 end
 Base.show(io::IO, s::SimulParameters) = print(io,
