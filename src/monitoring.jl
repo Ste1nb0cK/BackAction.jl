@@ -1,5 +1,7 @@
 export monitoringoperator
 
+
+
 struct SumProductJumpOperators{TypeParametricJumps<:Function,T3<:Int}
     Ls::Vector{TypeParametricJumps}
     nchannels::T3
@@ -7,15 +9,17 @@ struct SumProductJumpOperators{TypeParametricJumps<:Function,T3<:Int}
     function SumProductJumpOperators(Ls::Vector{T}, nlevels::T3) where {T<:Function,T3<:Int}
         new{T,T3}(Ls, length(Ls), nlevels)
     end
+
 end
 
-function (J::SumProductJumpOperators)(theta...)
+function (J::SumProductJumpOperators)(theta...)::Matrix{ComplexF64}
     aux = zeros(ComplexF64, J.nlevels, J.nlevels)
     for k in 1:J.nchannels
         aux = aux + adjoint(J.Ls[k](theta...)) * J.Ls[k](theta...)
     end
     return aux
 end
+
 
 struct ParametricEffectiveHamiltonian{TypeParametricHamiltonian<:Function,
     TypeParametricJumps<:Function}
@@ -28,32 +32,8 @@ end
 
 
 
-function (He::ParametricEffectiveHamiltonian)(theta...)
+function (He::ParametricEffectiveHamiltonian)(theta...)::Matrix{ComplexF64}
     return He.H(theta...) - 0.5im * He.J(theta...)
-end
-"""
-
-
-```
-getheff_parametrized(H_par::Function, Ls_par)
-```
-
-From the function `H_par`, which is assumed to be the parametrization of the hamiltonian, and
-an array of functions `Ls` which are assumed to parametrize the jump operators, return a function
-that's the  parametrization of the effective Hamiltonian.
-
-!!! note "About the Arguments"
-    The calculation of monitoring operator assumes that the arguments of `H_par` and the functions in
-    `Ls` are the same and in the same order.
-
-"""
-function getheff_parametrized(H_par::Tf, Ls_par::Vector{Tf2})::Function where {Tf<:Function,Tf2<:Function}
-    # here theta is expected to be a vector
-    return (theta...) -> begin # Get an arbitrary number of arguments
-        # The ... "splatts" the vector so it is passed as a tuple to the function
-        LLs_par = [adjoint(L_par(theta...)) * L_par(theta...) for L_par in Ls_par]
-        return (H_par(theta...) - 0.5im * sum(LLs_par))::Matrix{ComplexF64}
-    end
 end
 
 
@@ -90,6 +70,22 @@ function expheff_derivative(Heff_par::Tf, tau::T2, theta::Vector{T2}, dtheta::Ve
             +
             exp(-1im * tau * Heff_par((theta - 2 * dtheta)...)::ComplexF64)) / (12 * norm_dtheta)
 end
+
+
+function expheff_derivative(Heff_par::ParametricEffectiveHamiltonian{TH,TJ},
+    tau::T2, theta::Vector{T2}, dtheta::Vector{T2}) where {T2<:Real,TH<:Function,TJ<:Function}
+    aux1 = -1im * tau
+    norm_dtheta = norm(dtheta)
+    return (-exp(aux1 * Heff_par((theta + 2 * dtheta)...))
+            +
+            8 * exp(aux1 * Heff_par((theta + 1 * dtheta)...))
+            -
+            8 * exp(aux1 * Heff_par((theta - 1 * dtheta)...))
+            +
+            exp(-1im * tau * Heff_par((theta - 2 * dtheta)...))) / (12 * norm_dtheta)
+end
+
+
 
 
 """
@@ -211,8 +207,11 @@ is the state just after the ``n-th`` jump in the trajectory. They are returned a
 !!! note "Derivative order "
     The derivative is calculated using the five-point stencil rule.
 """
-function derivatives_atjumps(sys::System{T1,T3}, Heff_par::Function, Ls_par, traj::Trajectory{T2,T3}, psi0::Vector{T1},
-    theta::Vector{T2}, dtheta::Vector{T2}) where {T1<:Complex,T2<:Real,T3<:Int}
+
+# ParametricEffectiveHamiltonian{TH,TJ}
+function derivatives_atjumps(sys::System{T1,T3}, Heff_par::ParametricEffectiveHamiltonian{TH,TJ},
+    Ls_par::Vector{TJ}, traj::Trajectory{T2,T3}, psi0::Vector{T1},
+    theta::Vector{T2}, dtheta::Vector{T2}) where {T1<:Complex,T2<:Real,T3<:Int,TH<:Function,TJ<:Function}
     # 0. Special Case: if the trajectory is empty, return an empty array
     if isempty(traj)
         return Array{ComplexF64}(undef, 0, 0)
@@ -251,10 +250,11 @@ function derivatives_atjumps(sys::System{T1,T3}, Heff_par::Function, Ls_par, tra
 
 end
 
-function derivatives_atjumps(sys::System{T1,T3}, Heff_par::Function, Ls_par,
+function derivatives_atjumps(sys::System{T1,T3}, Heff_par::ParametricEffectiveHamiltonian{TH,TJ},
+    Ls_par::Vector{TJ},
     jumptimes::Vector{T2}, labels::Vector{T3}, psi0::Vector{T1},
     theta::Vector{T2},
-    dtheta::Vector{T2}) where {T1<:Complex,T2<:Real,T3<:Int}
+    dtheta::Vector{T2}) where {T1<:Complex,T2<:Real,T3<:Int,TJ<:Function,TH<:Function}
     # 0. Special Case: if the trajectory is empty, return an empty array
     if isempty(labels)
         return Array{ComplexF64}(undef, 0, 0)
@@ -355,8 +355,8 @@ so to access it at the time `t` you would do
 `monitoringoperator(t_given, sys, Heff_par, Ls_par, traj, psi0, theta, dtheta)[:, :, t]`.
 """
 function monitoringoperator(t_given::Vector{T2},
-    sys::System{T1,T3}, Heff_par::Function, Ls_par, traj::Trajectory{T2,T3}, psi0::Vector{T1}, theta::Vector{T2},
-    dtheta::Vector{T2}) where {T1<:Complex,T2<:Real,T3<:Int}
+    sys::System{T1,T3}, Heff_par::ParametricEffectiveHamiltonian{TH,TJ}, Ls_par::Vector{TJ}, traj::Trajectory{T2,T3}, psi0::Vector{T1}, theta::Vector{T2},
+    dtheta::Vector{T2}) where {T1<:Complex,T2<:Real,T3<:Int,TJ<:Function,TH<:Function}
 
     # Special case: if the time array is empty, return an empty array
     if isempty(t_given)
@@ -426,8 +426,8 @@ function monitoringoperator(t_given::Vector{T2},
 end
 
 function monitoringoperator(t_given::Vector{T2},
-    sys::System{T1,T3}, Heff_par::Function, Ls_par, jumptimes::Vector{T2}, labels::Vector{T3}, psi0::Vector{T1}, theta::Vector{T2},
-    dtheta::Vector{T2}) where {T1<:Complex,T2<:Real,T3<:Int}
+    sys::System{T1,T3}, Heff_par::ParametricEffectiveHamiltonian{TH,TJ}, Ls_par::Vector{TJ}, jumptimes::Vector{T2}, labels::Vector{T3}, psi0::Vector{T1}, theta::Vector{T2},
+    dtheta::Vector{T2}) where {T1<:Complex,T2<:Real,T3<:Int,TJ<:Function,TH<:Function}
 
     # Special case: if the time array is empty, return an empty array
     if isempty(t_given)
