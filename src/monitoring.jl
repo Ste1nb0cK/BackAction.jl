@@ -1,6 +1,29 @@
 export monitoringoperator
 
+struct SumProductJumpOperators{TypeParametricJumps<:Function}
+    Ls::Vector{TypeParametricJumps}
+end
+
+function (J::SumProductJumpOperators)(theta...)
+    return sum(adjoint(L(theta...)) * L(theta...) for L in J.Ls)
+end
+
+struct ParametricEffectiveHamiltonian{TypeParametricHamiltonian<:Function,
+    TypeParametricJumps<:Function}
+    H::TypeParametricHamiltonian
+    J::SumProductJumpOperators{TypeParametricJumps}
+    function ParametricEffectiveHamiltonian(H::TH, Ls::Vector{TJ}) where {TH<:Function,TJ<:Function}
+        new{TH,TJ}(H, SumProductJumpOperators(Ls))
+    end
+end
+
+
+
+function (He::ParametricEffectiveHamiltonian)(theta...)
+    return He.H(theta...) - 0.5im * He.J(theta...)
+end
 """
+
 
 ```
 getheff_parametrized(H_par::Function, Ls_par)
@@ -15,12 +38,12 @@ that's the  parametrization of the effective Hamiltonian.
     `Ls` are the same and in the same order.
 
 """
-function getheff_parametrized(H_par::Tf, Ls_par)::Function where {Tf<:Function}
+function getheff_parametrized(H_par::Tf, Ls_par::Vector{Tf2})::Function where {Tf<:Function,Tf2<:Function}
     # here theta is expected to be a vector
     return (theta...) -> begin # Get an arbitrary number of arguments
         # The ... "splatts" the vector so it is passed as a tuple to the function
         LLs_par = [adjoint(L_par(theta...)) * L_par(theta...) for L_par in Ls_par]
-        return H_par(theta...) - 0.5im * sum(LLs_par)
+        return (H_par(theta...) - 0.5im * sum(LLs_par))::Matrix{ComplexF64}
     end
 end
 
@@ -48,19 +71,15 @@ of the vector ``\\theta``.
     Preferably one in which  ``\\partial_i H_e`` commutes with ``H_e``, those are easier.
 """
 function expheff_derivative(Heff_par::Tf, tau::T2, theta::Vector{T2}, dtheta::Vector{T2}) where {T2<:Real,Tf<:Function}
-    # f1 = exp(-1im * tau * Heff_par((theta + 2 * dtheta)...))
-    # f2 = exp(-1im * tau * Heff_par((theta + 1 * dtheta)...))
-    # f3 = exp(-1im * tau * Heff_par((theta - 1 * dtheta)...))
-    # f4 = exp(-1im * tau * Heff_par((theta - 2 * dtheta)...))
     aux1 = -1im * tau
     norm_dtheta = norm(dtheta)
-    return (-exp(aux1 * Heff_par((theta + 2 * dtheta)...))
+    return (-exp(aux1 * Heff_par((theta + 2 * dtheta)...)::ComplexF64)
             +
-            8 * exp(aux1 * Heff_par((theta + 1 * dtheta)...))
+            8 * exp(aux1 * Heff_par((theta + 1 * dtheta)...)::ComplexF64)
             -
-            8 * exp(aux1 * Heff_par((theta - 1 * dtheta)...))
+            8 * exp(aux1 * Heff_par((theta - 1 * dtheta)...)::ComplexF64)
             +
-            exp(-1im * tau * Heff_par((theta - 2 * dtheta)...))) / (12 * norm_dtheta)
+            exp(-1im * tau * Heff_par((theta - 2 * dtheta)...)::ComplexF64)) / (12 * norm_dtheta)
 end
 
 
