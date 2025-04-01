@@ -1,19 +1,28 @@
 export monitoringoperator
 
-struct SumProductJumpOperators{TypeParametricJumps<:Function}
+struct SumProductJumpOperators{TypeParametricJumps<:Function,T3<:Int}
     Ls::Vector{TypeParametricJumps}
+    nchannels::T3
+    nlevels::T3
+    function SumProductJumpOperators(Ls::Vector{T}, nlevels::T3) where {T<:Function,T3<:Int}
+        new{T,T3}(Ls, length(Ls), nlevels)
+    end
 end
 
 function (J::SumProductJumpOperators)(theta...)
-    return sum(adjoint(L(theta...)) * L(theta...) for L in J.Ls)
+    aux = zeros(ComplexF64, J.nlevels, J.nlevels)
+    for k in 1:J.nchannels
+        aux = aux + adjoint(J.Ls[k](theta...)) * J.Ls[k](theta...)
+    end
+    return aux
 end
 
 struct ParametricEffectiveHamiltonian{TypeParametricHamiltonian<:Function,
     TypeParametricJumps<:Function}
     H::TypeParametricHamiltonian
-    J::SumProductJumpOperators{TypeParametricJumps}
-    function ParametricEffectiveHamiltonian(H::TH, Ls::Vector{TJ}) where {TH<:Function,TJ<:Function}
-        new{TH,TJ}(H, SumProductJumpOperators(Ls))
+    J::SumProductJumpOperators{TypeParametricJumps,Int64}
+    function ParametricEffectiveHamiltonian(H::TH, Ls::Vector{TJ}, nlevels::T3) where {TH<:Function,TJ<:Function,T3<:Int}
+        new{TH,TJ}(H, SumProductJumpOperators(Ls, nlevels))
     end
 end
 
