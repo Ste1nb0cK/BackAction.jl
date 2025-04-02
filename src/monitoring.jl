@@ -1,41 +1,81 @@
 export monitoringoperator
 
 
-
-struct SumProductJumpOperators{TypeParametricJumps<:Function,T3<:Int}
-    Ls::Vector{TypeParametricJumps}
-    nchannels::T3
-    nlevels::T3
-    function SumProductJumpOperators(Ls::Vector{T}, nlevels::T3) where {T<:Function,T3<:Int}
-        new{T,T3}(Ls, length(Ls), nlevels)
-    end
-
-end
-
-function (J::SumProductJumpOperators)(theta...)::Matrix{ComplexF64}
-    aux = zeros(ComplexF64, J.nlevels, J.nlevels)
-    for k in 1:J.nchannels
-        aux = aux + adjoint(J.Ls[k](theta...)) * J.Ls[k](theta...)
-    end
-    return aux
-end
-
-
-struct ParametricEffectiveHamiltonian{TypeParametricHamiltonian<:Function,
-    TypeParametricJumps<:Function}
-    H::TypeParametricHamiltonian
-    J::SumProductJumpOperators{TypeParametricJumps,Int64}
-    function ParametricEffectiveHamiltonian(H::TH, Ls::Vector{TJ}, nlevels::T3) where {TH<:Function,TJ<:Function,T3<:Int}
-        new{TH,TJ}(H, SumProductJumpOperators(Ls, nlevels))
+### Functions for passing from one unraveling to the next one
+function isometric_mixing_i(Ls::Vector{TJ}, Ti::Vector{T1}, nlevels::T3) where {T1<:Complex,TJ<:Function,T3<:Int}
+    nchannels0 = length(Ls)
+    return function (x...)
+        Lsnew_i = zeros(eltype(Ti), nlevels, nlevels)
+        for j in 1:nchannels0
+            Lsnew_i .+= Ti[j] * Ls[j](x...)
+        end
+        return Lsnew_i
     end
 end
 
-
-
-function (He::ParametricEffectiveHamiltonian)(theta...)::Matrix{ComplexF64}
-    return He.H(theta...) - 0.5im * He.J(theta...)
+function isometric_mixing(Ls::Vector{TJ}, Ti::Matrix{T1}, nlevels::T3) where {T1<:Complex,TJ<:Function,T3<:Int}
+    nchannels = size(Ti)[1]
+    return [isometric_mixing_i(Ls, Ti[i, :], nlevels) for i in 1:nchannels]
 end
 
+function add_cfield_i(L::TJ, alpha_i::T1, nlevels::T3) where {T1<:Complex,T3<:Int,TJ<:Function}
+    return function (x...)
+        return L(x...) + alpha_i * Matrix{ComplexF64}(I, nlevels, nlevels)
+    end
+end
+
+function add_cfields(Ls::Vector{TJ}, alpha::Vector{T1}, nlevels::T3) where {T1<:Complex,T3<:Int,TJ<:Function}
+    nchannels0 = length(Ls)
+    return [add_cfield_i(Ls[i], alpha[i], nlevels) for i in 1:nchannels0]
+end
+
+function get_LL(L::TJ) where {TJ<:Function}
+    return function (x...)
+        return adjoint(L(x...)) * L(x...)
+    end
+end
+
+function get_J(Ls::Vector{TJ}, nlevels::T3) where {TJ<:Function,T3<:Int}
+    return function (x...)
+        J = zeros(ComplexF64, nlevels, nlevels)
+        nchannels = length(Ls)
+        for i in 1:nchannels
+            J .+= get_LL(Ls[i])(x...)
+        end
+        return J
+    end
+end
+
+function get_Heff(H::TH, Ls::Vector{TJ}, nlevels::T3) where {TH<:Function,TJ<:Function,T3<:Int}
+    return function (x...)
+        return H(x...) - 0.5im * get_J(Ls, nlevels)(x...)
+    end
+end
+
+
+function get_cfield_hamiltonian_correctionterm_i(L::TJ, alpha_i::T1) where {TJ<:Function,T1<:Complex}
+    return function (x...)
+        return conj(alpha_i) * L(x...) - alpha_i * adjoint(L(x...))
+    end
+end
+
+function get_cfield_hamiltonian_correctionterm(Ls::Vector{TJ}, alpha::Vector{T1}, nlevels::T3) where {TJ<:Function,T1<:Complex,T3<:Int}
+    return function (x...)
+        aux = zeros(ComplexF64, nlevels, nlevels)
+        nchannels = length(Ls)
+        for i in 1:nchannels
+            aux .+= get_cfield_hamiltonian_correctionterm_i(Ls[i], alpha[i])(x...)
+        end
+        return aux
+    end
+end
+
+
+function add_cfield_hamiltonian_correctionterm(H::TH, Ls::Vector{TJ}, alpha::Vector{T1}, nlevels::T3) where {TH<:Function,TJ<:Function,T1<:Complex,T3<:Int}
+    return function (x...)
+        return H(x...) - 0.5im * get_cfield_hamiltonian_correctionterm(Ls, alpha, nlevels)(x...)
+    end
+end
 
 """
 
@@ -62,20 +102,6 @@ of the vector ``\\theta``.
 function expheff_derivative(Heff_par::Tf, tau::T2, theta::Vector{T2}, dtheta::Vector{T2}) where {T2<:Real,Tf<:Function}
     aux1 = -1im * tau
     norm_dtheta = norm(dtheta)
-    return (-exp(aux1 * Heff_par((theta + 2 * dtheta)...)::ComplexF64)
-            +
-            8 * exp(aux1 * Heff_par((theta + 1 * dtheta)...)::ComplexF64)
-            -
-            8 * exp(aux1 * Heff_par((theta - 1 * dtheta)...)::ComplexF64)
-            +
-            exp(-1im * tau * Heff_par((theta - 2 * dtheta)...)::ComplexF64)) / (12 * norm_dtheta)
-end
-
-
-function expheff_derivative(Heff_par::ParametricEffectiveHamiltonian{TH,TJ},
-    tau::T2, theta::Vector{T2}, dtheta::Vector{T2}) where {T2<:Real,TH<:Function,TJ<:Function}
-    aux1 = -1im * tau
-    norm_dtheta = norm(dtheta)
     return (-exp(aux1 * Heff_par((theta + 2 * dtheta)...))
             +
             8 * exp(aux1 * Heff_par((theta + 1 * dtheta)...))
@@ -84,9 +110,6 @@ function expheff_derivative(Heff_par::ParametricEffectiveHamiltonian{TH,TJ},
             +
             exp(-1im * tau * Heff_par((theta - 2 * dtheta)...))) / (12 * norm_dtheta)
 end
-
-
-
 
 """
 
@@ -209,7 +232,7 @@ is the state just after the ``n-th`` jump in the trajectory. They are returned a
 """
 
 # ParametricEffectiveHamiltonian{TH,TJ}
-function derivatives_atjumps(sys::System{T1,T3}, Heff_par::ParametricEffectiveHamiltonian{TH,TJ},
+function derivatives_atjumps(sys::System{T1,T3}, Heff_par::TH,
     Ls_par::Vector{TJ}, traj::Trajectory{T2,T3}, psi0::Vector{T1},
     theta::Vector{T2}, dtheta::Vector{T2}) where {T1<:Complex,T2<:Real,T3<:Int,TH<:Function,TJ<:Function}
     # 0. Special Case: if the trajectory is empty, return an empty array
@@ -250,7 +273,7 @@ function derivatives_atjumps(sys::System{T1,T3}, Heff_par::ParametricEffectiveHa
 
 end
 
-function derivatives_atjumps(sys::System{T1,T3}, Heff_par::ParametricEffectiveHamiltonian{TH,TJ},
+function derivatives_atjumps(sys::System{T1,T3}, Heff_par::TH,
     Ls_par::Vector{TJ},
     jumptimes::Vector{T2}, labels::Vector{T3}, psi0::Vector{T1},
     theta::Vector{T2},
@@ -355,7 +378,7 @@ so to access it at the time `t` you would do
 `monitoringoperator(t_given, sys, Heff_par, Ls_par, traj, psi0, theta, dtheta)[:, :, t]`.
 """
 function monitoringoperator(t_given::Vector{T2},
-    sys::System{T1,T3}, Heff_par::ParametricEffectiveHamiltonian{TH,TJ}, Ls_par::Vector{TJ}, traj::Trajectory{T2,T3}, psi0::Vector{T1}, theta::Vector{T2},
+    sys::System{T1,T3}, Heff_par::TH, Ls_par::Vector{TJ}, traj::Trajectory{T2,T3}, psi0::Vector{T1}, theta::Vector{T2},
     dtheta::Vector{T2}) where {T1<:Complex,T2<:Real,T3<:Int,TJ<:Function,TH<:Function}
 
     # Special case: if the time array is empty, return an empty array
@@ -426,7 +449,7 @@ function monitoringoperator(t_given::Vector{T2},
 end
 
 function monitoringoperator(t_given::Vector{T2},
-    sys::System{T1,T3}, Heff_par::ParametricEffectiveHamiltonian{TH,TJ}, Ls_par::Vector{TJ}, jumptimes::Vector{T2}, labels::Vector{T3}, psi0::Vector{T1}, theta::Vector{T2},
+    sys::System{T1,T3}, Heff_par::TH, Ls_par::Vector{TJ}, jumptimes::Vector{T2}, labels::Vector{T3}, psi0::Vector{T1}, theta::Vector{T2},
     dtheta::Vector{T2}) where {T1<:Complex,T2<:Real,T3<:Int,TJ<:Function,TH<:Function}
 
     # Special case: if the time array is empty, return an empty array
