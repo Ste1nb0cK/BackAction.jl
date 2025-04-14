@@ -7,6 +7,7 @@ using ProgressMeter
 using Base.Threads
 using Random
 using DifferentialEquations
+using ForwardDiff
 import StatsBase
 
 # Source files

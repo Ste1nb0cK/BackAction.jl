@@ -28,8 +28,8 @@ struct System{T1<:Complex,T3<:Int}
     NLEVELS::T3 # Number of levels of the system
     NCHANNELS::T3 # Number of jump channels
     H::Matrix{T1} # Hamiltonian
-    Ls::Vector{Matrix{T1}} # List of jump operators
-    LLs::Vector{Matrix{T1}} # List of L^\daggerL
+    Ls::Array{T1,3} # array of jump operators
+    LLs::Array{T1,3} # List of L^\daggerL
     J::Matrix{T1} # Sum of Jump operators
     Heff::Matrix{T1} # Effective Hamiltonian
 
@@ -39,59 +39,64 @@ struct System{T1<:Complex,T3<:Int}
          `H::Matrix{ComplexF64}`
          `Ls::Vector{Matrix{ComplexF64}}`
 "
-    function System(H::Matrix{T1}, Ls::Vector{Matrix{T1}}) where {T1<:Complex}
-        NLEVELS = size(H)[1]
-        NCHANNELS = size(Ls)[1] # Number of jump channels
-        J = zeros(T1, NLEVELS, NLEVELS)
-        LLs = Vector{Matrix{T1}}(undef, NCHANNELS)
-        for k in 1:NCHANNELS
-            product = adjoint(Ls[k]) * Ls[k]
-            J = J + product
-            LLs[k] = product
+    function System(H::Matrix{T1}, Ls::Array{T1}, nlevels::T3, nchannels::T3) where {T1<:Complex,T3<:Int}
+        # NLEVELS = size(H, 1)
+        # NCHANNELS = size(Ls, 3) # Number of jump channels
+        J = zeros(T1, nlevels, nlevels)
+        tmp = zeros(T1, nlevels, nlevels)
+        LLs = zeros(T1, nlevels, nlevels, nchannels)
+        for k in 1:nchannels
+            mul!(tmp, adjoint(Ls[:, :, k]), Ls[:, :, k])
+            LLs[:, :, k] .= tmp
+            J .+= tmp
         end
-        He = H - 0.5im * J
-        new{T1,typeof(NLEVELS)}(NLEVELS, NCHANNELS, H, Ls, LLs, J, He)
+        new{T1,T3}(nlevels, nchannels, H, Ls, LLs, J, H - 0.5im * J)
     end
     "
         Constructor that allows specifying the alphas and the T's.
         The dimension of T must be Nxk, where k=lenght(Ls) but N might be arbitrary.
         It is expected for T to be unitary
     "
-    function System(H::Matrix{T1}, Ls::Vector{Matrix{T1}},
+    function System(H::Matrix{T1}, Ls::Array{T1},
         T::Matrix{T1}, alphas::Vector{T1}) where {T1<:Complex}
-        NLEVELS = size(H)[1]
-        NCHANNELS = size(T)[1] # Number of jump channels
-        k = length(Ls) # number of original jump operators
+        NLEVELS = size(H, 1)
+        NCHANNELS = size(T, 1) # Number of jump channels
+        nchannels0 = size(Ls, 3) # number of original jump operators
         # To set th
         J = zeros(T1, NLEVELS, NLEVELS)
-        H_ = copy(H)
         # unitary mixing
-        Lprimes = [sum(T[i, j] * Ls[j] for j in 1:k) for i in 1:NCHANNELS]
-        # Now add the fields and update the hamiltonian
+        Lprimes = zeros(T1, NLEVELS, NLEVELS, NCHANNELS)
         for i in 1:NCHANNELS
-            Lprimes[i] = Lprimes[i] + alphas[i] * I
-            H_ = H_ - 0.5im * (conj(alphas[i]) * Lprimes[i] - alphas[i] * adjoint(Lprimes[i]))
+            for j in 1:nchannels0
+                Lprimes[:, :, i] .+= T[i, j] * Ls[:, :, j]
+            end
         end
-
+        # Now update the hamiltonian and add the fields
+        for i in 1:NCHANNELS
+            H .+= -0.5im * (conj(alphas[i]) * Lprimes[:, :, i] - alphas[i] * adjoint(Lprimes[:, :, i]))
+            Lprimes[:, :, i] = Lprimes[:, :, i] + alphas[i] * I
+        end
         #  set the effective hamiltonian
-        LLs = Vector{Matrix{T1}}(undef, NCHANNELS)
+        LLs = Array{T1}(undef, NLEVELS, NLEVELS, NCHANNELS)
         J = zeros(T1, NLEVELS, NLEVELS)
         for k in 1:NCHANNELS
-            product = adjoint(Lprimes[k]) * Lprimes[k]
-            J = J + product
-            LLs[k] = product
+            LLs[:, :, k] .= adjoint(Lprimes[:, :, k]) * Lprimes[:, :, k]
+            J .+= LLs[:, :, k]
         end
-        He = H_ - 0.5im * J
-        new{T1,typeof(NLEVELS)}(NLEVELS, NCHANNELS, H_, Lprimes, LLs, J, He)
+        new{T1,typeof(NLEVELS)}(NLEVELS, NCHANNELS, H, Lprimes, LLs, J, H - 0.5im * J)
     end
 
 end
 Base.show(io::IO, s::System) = print(io,
     "System(NLEVELS=$(s.NLEVELS)\nNCHANNELS=$(s.NCHANNELS)\nH=$(s.H)\nLs=$(s.Ls)\nJ=$(s.J))\nHeff=$(s.Heff))")
-function Base.deepcopy(sys::System{T}) where {T<:ComplexF64}
+# Ensures elements are fully copied
+import Base.deepcopy
+function Base.deepcopy(sys::S) where {S<:System}
     return System(
-        deepcopy(sys.H),
-        [deepcopy(L) for L in sys.Ls]  # Ensures elements are fully copied
+        deepcopy(getfield(sys, :H)),
+        deepcopy(getfield(sys, :Ls)),
+        deepcopy(getfield(sys, :NLEVELS)),
+        deepcopy(getfield(sys, :NCHANNELS))
     )
 end
 

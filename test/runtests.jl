@@ -1,12 +1,12 @@
 using BackAction
 using Test
 using LinearAlgebra
-using QuadGK
-using ProgressMeter
 using Statistics
 using Random
 using Distributions
 import HypothesisTests
+using QuadGK
+using ProgressMeter
 @testset "Complete Test" begin
     @testset "Radiative Damping" begin
         include("test_radiative_damping.jl")

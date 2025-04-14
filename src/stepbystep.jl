@@ -38,25 +38,44 @@ random numbers and applying the jump update rule.
 """
 struct _LindbladJump{T1<:Complex,
     T2<:Real, #type of the effective hamiltonian
-    RNGType<:Xoshiro, # type of the RNG
-    T3<:Ref{Float64}, # type of the random vector one uses to sample
+    # RNGType<:Xoshiro, # type of the RNG
+    # T3<:Ref{Float64}, # type of the random vector one uses to sample
     T4<:Int, # channel labels vector
-    JCT<:Ref{Int64}, # jump counter
+    # JCT<:Ref{Int64}, # jump counter
 }
-    Ls::Vector{Matrix{T1}}# Jump operators
-    LLs::Vector{Matrix{T1}} # Products of the jump operators
+    Ls::Array{T1,3}# Jump operators
+    LLs::Array{T1,3} # Products of the jump operators
     Heff::Matrix{T1} # Effective Hamiltonian
-    rng::RNGType # Random number generator
-    r::T3 # Random number for sampling, this is inteded to be a Ref
+    rng::Xoshiro # Random number generator
+    r::Ref{Float64} # Random number for sampling, this is inteded to be a Ref
     # Next stuff is for convenience in doing the jump update, here we basically preallocate memory for it
     weights::Vector{T2}
     cumsum::Vector{T2}
     cache_state::Vector{T1}
     jump_times::Vector{T2}
     jump_channels::Vector{T4}
-    jump_counter::JCT
+    jump_counter::Ref{Int64}
 
 end
+
+import Base.deepcopy_internal
+function Base.deepcopy_internal(affect!::T, dict::IdDict) where {T<:BackAction._LindbladJump}
+    return BackAction._LindbladJump(
+        deepcopy_internal(getfield(affect!, :Ls), dict),
+        deepcopy_internal(getfield(affect!, :LLs), dict),
+        deepcopy_internal(getfield(affect!, :Heff), dict),
+        deepcopy_internal(getfield(affect!, :rng), dict)::Xoshiro,
+        Ref(1.0),
+        deepcopy_internal(getfield(affect!, :weights), dict),
+        deepcopy_internal(getfield(affect!, :cumsum), dict),
+        deepcopy_internal(getfield(affect!, :cache_state), dict),
+        deepcopy_internal(getfield(affect!, :jump_times), dict),
+        deepcopy_internal(getfield(affect!, :jump_channels), dict),
+        Ref(1)
+    )
+end
+
+
 
 """
 ```
@@ -105,12 +124,12 @@ function _lindblad_jump_affect!(integrator, Ls, LLs, Heff, rng, r, weights, cums
     # do the jump update
     ψ = integrator.u
     @inbounds for i in eachindex(weights)
-        weights[i] = real(dot(ψ, LLs[i], ψ))
+        weights[i] = real(dot(ψ, LLs[:, :, i], ψ))
     end
     cumsum!(cumsum, weights)
     r[] = rand(rng) * sum(weights) # Multiply by the sum of weights because this is an unnormalized distribution
     collapse_idx = getindex(1:length(weights), findfirst(>(r[]), cumsum)) # get the channel
-    mul!(cache_state, Ls[collapse_idx], ψ)
+    mul!(cache_state, Ls[:, :, collapse_idx], ψ)
     normalize!(cache_state)
     copyto!(integrator.u, cache_state)
     #save jump information and prepare for new jump
@@ -142,6 +161,33 @@ function (f::_LindbladJump)(integrator)
         f.cumsum, f.cache_state, f.jump_times, f.jump_channels, f.jump_counter)
 end
 
+struct HeffEvolution #{T1<:Complex}
+    Heff::Matrix{ComplexF64}
+end
+
+function Base.deepcopy_internal(h::HeffEvolution, dict::IdDict) #where {T1<:Complex}
+    return HeffEvolution(deepcopy_internal(h.Heff, dict))
+end
+
+function (Heff::HeffEvolution)(du::Vector{T1}, u::Vector{T1}, p, t) where {T1<:Complex}
+    du .= -1im * getfield(Heff, :Heff) * u
+end
+
+
+struct JumpCondition
+    r::Ref{Float64}
+end
+
+function Base.deepcopy_internal(c::JumpCondition, dict::IdDict)
+    JumpCondition(Ref(1.0))
+end
+
+function (condition::JumpCondition)(u, t, integrator)
+    real(dot(u, u)) - condition.r[]
+end
+
+
+
 """
 ```
 
@@ -153,26 +199,26 @@ Create a callback to perform jump updates in the MCW method, appropiate for the 
 the type of the `weights` and `cumsum`.
 """
 function _create_callback(sys::System, params::SimulParameters, tspan::Tuple{T1,T1}, rng::Xoshiro) where {T1<:Real}
-    ttype = typeof(tspan[1])
+    ttype = eltype(tspan)
     Random.seed!(rng, params.seed)
     _jump_affect! = _LindbladJump(
-        sys.Ls,
-        sys.LLs,
-        sys.Heff,
+        getfield(sys, :Ls),
+        getfield(sys, :LLs),
+        getfield(sys, :Heff),
         rng,
         Ref{Float64}(rand(rng)),
         Vector{ttype}(undef, sys.NCHANNELS),
         Vector{ttype}(undef, sys.NCHANNELS),
-        similar(params.psi0),
+        similar(getfield(params, :psi0)),
         Vector{Float64}(undef, JUMP_TIMES_INIT_SIZE),
         Vector{Int64}(undef, JUMP_TIMES_INIT_SIZE),
         Ref{Int64}(1)
     )
 
-    function condition(u, t, integrator)
-        real(dot(u, u)) - _jump_affect!.r[]
-    end
-    return ContinuousCallback(condition, _jump_affect!; save_positions=(true, true))
+    # function condition(u, t, integrator)
+    #     real(dot(u, u)) - _jump_affect!.r[]
+    # end
+    return ContinuousCallback(JumpCondition(_jump_affect!.r[]), _jump_affect!; save_positions=(true, true))
 end
 
 """
@@ -187,16 +233,15 @@ solver should save the solution.
 """
 function _generate_trajectoryproblem_jumps(sys::System, params::SimulParameters,
     tspan::Tuple{T2,T2}; kwargs...)::ODEProblem where {T2<:Real}
-    function f!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p, t)
-        du .= -1im * sys.Heff * u
-    end
-    # create the LindbladJump that will hold the affect!
+    f! = HeffEvolution(getfield(sys, :Heff))
+    # # create the LindbladJump that will hold the affect!
     rng = Random.Xoshiro()
     cb = _create_callback(sys, params, tspan, rng)
 
     # return ODEProblem{true}(f!, params.psi0, tspan; callback=cb, saveat=t_eval, kwargs...)
     return ODEProblem{true}(f!, params.psi0, tspan; callback=cb, kwargs...)
 end
+
 
 
 """
@@ -212,12 +257,13 @@ function _prob_func_jumps(prob, i, repeat)
     Random.seed!(rng, i)
     affect0! = prob.kwargs[:callback].affect!
     _jump_affect! = _similar_affect!(affect0!, rng)
-    function condition(u, t, integrator)
-        real(dot(u, u)) - _jump_affect!.r[]
-    end
-    cb = ContinuousCallback(condition, _jump_affect!)
+    # function condition(u, t, integrator)
+    #     real(dot(u, u)) - _jump_affect!.r[]
+    # end
+    # cb = ContinuousCallback(condition, _jump_affect!)
+    cb = ContinuousCallback(JumpCondition(_jump_affect!.r), _jump_affect!)
     f = deepcopy(prob.f.f)
-    return remake(prob, f=f, callback=cb)
+    return remake(prob; f=f, callback=cb)
 end
 
 """
@@ -230,7 +276,7 @@ according to `params`.
 """
 function _get_ensemble_problem_jumps(sys, params, tspan; kwargs...)
     prob_sys = _generate_trajectoryproblem_jumps(sys, params, tspan; kwargs...)
-    return EnsembleProblem(prob_sys, prob_func=_prob_func_jumps, output_func=_output_func, safetycopy=false)
+    return EnsembleProblem(prob_sys; prob_func=_prob_func_jumps, output_func=_output_func, safetycopy=false)
 end
 
 
@@ -257,7 +303,7 @@ function get_sol_jumps(sys::System, params::SimulParameters, tspan::Tuple{T,T}, 
     kwargs...) where {T<:Real}
     # set the ensemble problem
     ensemble_prob = _get_ensemble_problem_jumps(sys, params, tspan; kwargs...)
-    return solve(ensemble_prob, alg, ensemblealg; trajectories=params.ntraj)
+    return solve(ensemble_prob, alg, ensemblealg, trajectories=params.ntraj)
 end
 
 
