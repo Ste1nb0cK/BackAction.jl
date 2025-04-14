@@ -1,4 +1,4 @@
-export get_sol_jumps_monitoring
+export get_sol_jumps_monitoring, evaluate_and_fill_Ls!, evaluate_and_fill_Ls_dLs
 ### Functions for passing from one unraveling to the next one
 function isometric_mixing_i(Ls::Vector{TJ}, Ti::Vector{T1}, nlevels::T3) where {T1<:Complex,TJ<:Function,T3<:Int}
     f = let Ls = Ls, Ti = Ti, nlevels = nlevels
@@ -85,6 +85,22 @@ function add_cfield_hamiltonian_correctionterm(H::TH, Ls::Vector{TJ}, alpha::Vec
         (x...) -> H(x...) - 0.5im * get_cfield_hamiltonian_correctionterm(Ls, alpha, nlevels)(x...)
     end
     return f
+end
+
+function evaluate_and_fill_Ls!(Ls::Vector{TJ}, theta::T2,
+    Ls_store::Array{T1}, nchannels::T3) where {T1<:Complex,T2<:Real,T3<:Int,TJ<:Function}
+    for k in nchannels
+        Ls_store[:, :, k] .= Ls[k](theta)
+    end
+end
+
+function evaluate_and_fill_Ls_dLs(Ls::Vector{TJ}, theta::T2,
+    Ls_store::Array{T1}, dLs_store::Array{T1}, nchannels::T3) where {T1<:Complex,T2<:Real,T3<:Int,TJ<:Function}
+
+    for k in 1:nchannels
+        Ls_store[:, :, k] .= Ls[k](theta)
+        ForwardDiff.derivative!(view(dLs_store, :, :, k), Ls[k], theta)
+    end
 end
 
 ################### Integration stuff
