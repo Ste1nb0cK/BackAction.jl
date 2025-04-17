@@ -267,7 +267,7 @@ algorithm for the solver via `alg` and `ensemblealg`, and  even pass any valid
 function get_sol_jumps_monitoring(dtheta::T2, dLs::Array{T1}, He_forward::Matrix{T1},
     He_backward::Matrix{T1}, sys::System, params::SimulParameters,
     tspan::Tuple{T2,T2}, alg=Tsit5(),
-    ensemblealg=EnsembleThreads(); kwargs...) where {T1<:Complex,T2<:Real}
+    ensemblealg=EnsembleDistributed(); kwargs...) where {T1<:Complex,T2<:Real}
     # set the ensemble problem
     ensemble_prob = _get_ensemble_problem_jumps_monitoring(dtheta, dLs, He_forward, He_backward,
         sys, params, tspan; kwargs...)
