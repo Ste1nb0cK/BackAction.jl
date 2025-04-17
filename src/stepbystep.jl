@@ -244,13 +244,13 @@ end
 
 
 
-"""
-```
-_prob_func_jumps(prob, i, repeat)
-```
-Function for creating new problems from a given trajectory problem. This is intended to be
-used in the initialization of an ensemble problem, see: https://docs.sciml.ai/DiffEqDocs/stable/features/ensemble/
-"""
+# """
+# ```
+# _prob_func_jumps(prob, i, repeat)
+# ```
+# Function for creating new problems from a given trajectory problem. This is intended to be
+# used in the initialization of an ensemble problem, see: https://docs.sciml.ai/DiffEqDocs/stable/features/ensemble/
+# """
 function _prob_func_jumps(prob, i, repeat)
     # First, initialize a new RNG with the corresponding seed
     rng = Random.Xoshiro()

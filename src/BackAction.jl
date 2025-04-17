@@ -4,9 +4,10 @@ module BackAction
 using LinearAlgebra
 using Statistics
 using ProgressMeter
-using Base.Threads
-using Random
 using DifferentialEquations
+using Base.Threads
+using Distributed
+using Random
 using ForwardDiff
 import StatsBase
 
@@ -16,6 +17,7 @@ include("functions_jump.jl")
 include("gillipsie.jl")
 include("stepbystep.jl")
 include("run_trajectories.jl")
+include("parametric_mixing.jl")
 include("monitoring.jl")
 # Utilities
 include("../util/pauli_m.jl")
@@ -23,4 +25,13 @@ include("../util/rd_ex.jl")
 include("../util/rd_temperature_ex.jl")
 include("../util/rf_ex.jl")
 include("../util/rk4.jl")
+
+# Initialize for multiprocessing
+function __init__()
+    @everywhere _prob_func_jumps
+    if nprocs() == 1
+        addprocs(4)
+    end
+end
+
 end
