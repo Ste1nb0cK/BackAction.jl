@@ -299,7 +299,7 @@ will store the states are defined by `t_eval`. Additionally, you can choose the
 algorithm for the solver via `alg` and `ensemblealg`, and  even pass any valid
 `keyword argument` valid in `DifferentialEquations.jl` through `kwargs`
 """
-function get_sol_jumps(sys::System, params::SimulParameters, tspan::Tuple{T,T}, alg=Tsit5(), ensemblealg=EnsembleThreads();
+function get_sol_jumps(sys::System, params::SimulParameters, tspan::Tuple{T,T}, alg=Tsit5(), ensemblealg=EnsembleDistributed();
     kwargs...) where {T<:Real}
     # set the ensemble problem
     ensemble_prob = _get_ensemble_problem_jumps(sys, params, tspan; kwargs...)
