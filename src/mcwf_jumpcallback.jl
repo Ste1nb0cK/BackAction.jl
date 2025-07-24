@@ -1,13 +1,3 @@
-# AUTHOR: Nicolás Niño-Salas
-# Date: 2025
-# DESCRIPTION:
-#  Implementation of the Monte Carlo Wavefunction method, heavily inspired by that
-#  of the mcsolver in QuantumToolBox.jl. It relies very heavily in the
-#  DifferentialEquations.jl library, particularly on the use of callbacks
-#  and parallel ensemble solutions, see:
-# https://docs.sciml.ai/DiffEqDocs/stable/features/callback_functions/#Using-Callbacks
-# https://docs.sciml.ai/DiffEqDocs/stable/features/ensemble/
-
 # @docs " Number of maximum number of jumps that's initially expected to be stored"
 const JUMP_TIMES_INIT_SIZE::Int64 = 200
 
@@ -173,7 +163,6 @@ function (Heff::HeffEvolution)(du::Vector{T1}, u::Vector{T1}, p, t) where {T1<:C
     du .= -1im * getfield(Heff, :Heff) * u
 end
 
-
 struct JumpCondition
     r::Ref{Float64}
 end
@@ -186,125 +175,10 @@ function (condition::JumpCondition)(u, t, integrator)
     real(dot(u, u)) - condition.r[]
 end
 
-
-
-"""
-```
-
-_create_callback(sys::System, params::SimulParameters, t_eval::AbstractVector, rng)
-
-```
-Create a callback to perform jump updates in the MCW method, appropiate for the given system.
-`params` is used to provide the seed and the initial state, while `t_eval` for infering
-the type of the `weights` and `cumsum`.
-"""
-function _create_callback(sys::System, params::SimulParameters, tspan::Tuple{T1,T1}, rng::Xoshiro) where {T1<:Real}
-    ttype = eltype(tspan)
-    Random.seed!(rng, params.seed)
-    _jump_affect! = _LindbladJump(
-        getfield(sys, :Ls),
-        getfield(sys, :LLs),
-        getfield(sys, :Heff),
-        rng,
-        Ref{Float64}(rand(rng)),
-        Vector{ttype}(undef, sys.NCHANNELS),
-        Vector{ttype}(undef, sys.NCHANNELS),
-        similar(getfield(params, :psi0)),
-        Vector{Float64}(undef, JUMP_TIMES_INIT_SIZE),
-        Vector{Int64}(undef, JUMP_TIMES_INIT_SIZE),
-        Ref{Int64}(1)
-    )
-
-    # function condition(u, t, integrator)
-    #     real(dot(u, u)) - _jump_affect!.r[]
-    # end
-    return ContinuousCallback(JumpCondition(_jump_affect!.r[]), _jump_affect!; save_positions=(true, true))
-end
-
-"""
-```
-
-_generate_trajectoryproblem_jumps(sys::System, params::SimulParameters, t_eval::AbstractVector; kwargs... )
-
-```
-Generate a ODEProblem for the given `System`, corresponding to a single trajectory of the MCW method.
-The initial condition and seed are passed via `params`, while `t_eval` sets the points at which the
-solver should save the solution.
-"""
-function _generate_trajectoryproblem_jumps(sys::System, params::SimulParameters,
-    tspan::Tuple{T2,T2}; kwargs...)::ODEProblem where {T2<:Real}
-    f! = HeffEvolution(getfield(sys, :Heff))
-    # # create the LindbladJump that will hold the affect!
-    rng = Random.Xoshiro()
-    cb = _create_callback(sys, params, tspan, rng)
-
-    # return ODEProblem{true}(f!, params.psi0, tspan; callback=cb, saveat=t_eval, kwargs...)
-    return ODEProblem{true}(f!, params.psi0, tspan; callback=cb, kwargs...)
-end
-
-
-
-# """
-# ```
-# _prob_func_jumps(prob, i, repeat)
-# ```
-# Function for creating new problems from a given trajectory problem. This is intended to be
-# used in the initialization of an ensemble problem, see: https://docs.sciml.ai/DiffEqDocs/stable/features/ensemble/
-# """
-function _prob_func_jumps(prob, i, repeat)
-    # First, initialize a new RNG with the corresponding seed
+function _initialize_similarcb(i, affect!::_LindbladJump)::ContinuousCallback
     rng = Random.Xoshiro()
     Random.seed!(rng, i)
-    affect0! = prob.kwargs[:callback].affect!
-    _jump_affect! = _similar_affect!(affect0!, rng)
-    # function condition(u, t, integrator)
-    #     real(dot(u, u)) - _jump_affect!.r[]
-    # end
-    # cb = ContinuousCallback(condition, _jump_affect!)
+    _jump_affect! = _similar_affect!(affect!, rng)
     cb = ContinuousCallback(JumpCondition(_jump_affect!.r), _jump_affect!)
-    f = deepcopy(prob.f.f)
-    return remake(prob; f=f, callback=cb)
+    return cb
 end
-
-"""
-```
-_get_ensemble_problem_jumps(sys, params, t_eval; kwargs...)
-```
-Initialize an ensemble ODEProblem from the given `System`. The initial
-state for all the trajectories is assumed to be the same, and the seed is set
-according to `params`.
-"""
-function _get_ensemble_problem_jumps(sys, params, tspan; kwargs...)
-    prob_sys = _generate_trajectoryproblem_jumps(sys, params, tspan; kwargs...)
-    return EnsembleProblem(prob_sys; prob_func=_prob_func_jumps, output_func=_output_func, safetycopy=false)
-end
-
-
-# Resize the vectors and make them have the waiting time instead of the global time
-function _output_func(sol, i)
-    idx = sol.prob.kwargs[:callback].affect!.jump_counter[]
-    resize!(sol.prob.kwargs[:callback].affect!.jump_channels, idx - 1)
-    resize!(sol.prob.kwargs[:callback].affect!.jump_times, idx - 1)
-    return (sol, false)
-end
-
-
-"""
-```
-get_sol_jumps(sys, params, t_eval, alg=nothing, ensemblealg=ensemblethreads(); kwargs...)
-```
-Obtain an ensemble solution for the trajectories of the system `sys`, with the
-seed and initial state passed in `params`, and the times at which the solver
-will store the states are defined by `t_eval`. Additionally, you can choose the
-algorithm for the solver via `alg` and `ensemblealg`, and  even pass any valid
-`keyword argument` valid in `DifferentialEquations.jl` through `kwargs`
-"""
-function get_sol_jumps(sys::System, params::SimulParameters, tspan::Tuple{T,T}, alg=Tsit5(), ensemblealg=EnsembleDistributed();
-    kwargs...) where {T<:Real}
-    # set the ensemble problem
-    ensemble_prob = _get_ensemble_problem_jumps(sys, params, tspan; kwargs...)
-    return solve(ensemble_prob, alg, ensemblealg, trajectories=params.ntraj)
-end
-
-
-export get_sol_jumps
