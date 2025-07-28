@@ -7,8 +7,8 @@ rdt_gamma1 = (rdt_n + 1) * rdt_gamma
 rdt_gamma2 = (rdt_n) * rdt_gamma
 
 Ls = Array{ComplexF64}(undef, rdt_NLEVELS, rdt_NLEVELS, rdt_NCHANNELS)
-Ls[:, :, 1] = sqrt(rdt_gamma1) * BackAction.sigma_m
-Ls[:, :, 2] = sqrt(rdt_gamma2) * BackAction.sigma_p
+Ls[:, :, 1] = sqrt(rdt_gamma1) * sigma_m
+Ls[:, :, 2] = sqrt(rdt_gamma2) * sigma_p
 rdt_sys = System(zeros(ComplexF64, 2, 2), # Hamiltonian
     Ls, 2, 2) #Jump Operators
 #### 2. Create the simulation parameters instance

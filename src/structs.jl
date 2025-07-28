@@ -1,3 +1,5 @@
+module BackActionCoreStructs
+using ..SharedDependencies
 export System, SimulParameters, DetectionClick, Trajectory
 
 ################# SYSTEM #######################################################
@@ -173,5 +175,5 @@ struct SimulParameters{T1<:Complex,T2<:Real,T3<:Int}
 end
 Base.show(io::IO, s::SimulParameters) = print(io,
     "SimulParameters(psi0=$(s.psi0)\nnsamples=$(s.nsamples)\nseed=$(s.seed)\nntraj=$(s.ntraj))\nmultiplier=$(s.multiplier)\ntf=$(s.tf)\ndt=$(s.dt)\neps=$(s.eps))")
-
+end
 

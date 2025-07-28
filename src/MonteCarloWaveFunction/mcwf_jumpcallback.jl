@@ -49,8 +49,8 @@ struct _LindbladJump{T1<:Complex,
 end
 
 import Base.deepcopy_internal
-function Base.deepcopy_internal(affect!::T, dict::IdDict) where {T<:BackAction._LindbladJump}
-    return BackAction._LindbladJump(
+function Base.deepcopy_internal(affect!::T, dict::IdDict) where {T<:MonteCarloWaveFunction._LindbladJump}
+    return MonteCarloWaveFunction._LindbladJump(
         deepcopy_internal(getfield(affect!, :Ls), dict),
         deepcopy_internal(getfield(affect!, :LLs), dict),
         deepcopy_internal(getfield(affect!, :Heff), dict),

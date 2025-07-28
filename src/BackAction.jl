@@ -1,32 +1,25 @@
 module BackAction
 
-# Dependencies
-using LinearAlgebra
-using Statistics
-using ProgressMeter
-using DifferentialEquations
-using DiffEqCallbacks
-using Base.Threads
+module SharedDependencies
+using Reexport
+@reexport using LinearAlgebra
+@reexport using Statistics
+@reexport using Random
+end
+
 using Distributed
-using Random
-using ForwardDiff
-import StatsBase
-
-# Source files
 include("structs.jl")
-include("functions_jump.jl")
-include("gillipsie.jl")
-include("mcwf_jumpcallback.jl")
-include("mcwf_savecallback.jl")
-include("mcwf.jl")
-include("run_trajectories.jl")
-include("parametric_mixing.jl")
-include("monitoring.jl")
-# Utilities
-include("../util/pauli_m.jl")
-include("../util/rd_ex.jl")
-include("../util/rd_temperature_ex.jl")
-include("../util/rf_ex.jl")
-include("../util/rk4.jl")
-
+include("Gillipsie/Gillipsie.jl")
+include("MonteCarloWaveFunction/MonteCarloWaveFunction.jl")
+include("Utilities/Utilities.jl")
+#
+# module MonitoringOperator
+# using ..BackAction: System, SimulParameters
+# using DifferentialEquations
+# using DiffEqCallbacks
+# using ForwardDiff
+# include("./MonitoringOperator/parametric_mixing.jl")
+# include("./MonitoringOperator/monitoring.jl")
+# end
+#
 end

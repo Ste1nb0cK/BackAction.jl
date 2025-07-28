@@ -22,9 +22,9 @@
 #\end{pmatrix}
 #\left( \gamma^2 + 2\Omega^2 + 4\Delta^2 \right)^{-1}.
 
-using LinearAlgebra, BackAction, Statistics, Distributed, DifferentialEquations, Test
-addprocs(1)
-@everywhere using BackAction
+using LinearAlgebra, BackAction, BackAction.MonteCarloWaveFunction, Statistics, Distributed, DifferentialEquations, Test
+addprocs(4)
+@everywhere using BackAction.MonteCarloWaveFunction
 
 
 const NCHANNELS0::Int64 = 1
@@ -36,8 +36,8 @@ const tf = 2 * pi / OMEGA * 7
 const tspan = (0.0, tf)
 const ntimes = 100
 const tlist = collect(LinRange(0.0, tf, ntimes))
-const ntraj = 1000
-const params_simul = BackAction.SimulParameters([0.0 + 0im, 1.0],
+const ntraj = 5000
+const params_simul = BackAction.BackActionCoreStructs.SimulParameters([0.0 + 0im, 1.0],
     tf, # Final time. Set very long so that all trajectories jump
     1, # seed
     ntraj,
@@ -50,7 +50,7 @@ const T = reshape([1.0 + 0.0im], 1, 1)
 const alphaa = [0.0 + 0.0im]
 const nchannels = length(alphaa)
 
-const sigma = [BackAction.sigma_x, BackAction.sigma_y, BackAction.sigma_z]
+const sigma = [BackAction.Utilities.sigma_x, BackAction.Utilities.sigma_y, BackAction.Utilities.sigma_z]
 
 function get_lindbladsol(delta, tspan, u0)
     function rf_ode!(dr, r, p, t)
@@ -70,16 +70,16 @@ y_ss(delta) = normalization_ss(delta) * (2 * GAMMA * OMEGA)
 z_ss(delta) = normalization_ss(delta) * (-GAMMA^2 - 4 * delta^2)
 
 
-u0 = [real(dot(params_simul.psi0, BackAction.sigma_x, params_simul.psi0)),
-    real(dot(params_simul.psi0, BackAction.sigma_y, params_simul.psi0)),
-    real(dot(params_simul.psi0, BackAction.sigma_z, params_simul.psi0))]
+u0 = [real(dot(params_simul.psi0, sigma[1], params_simul.psi0)),
+    real(dot(params_simul.psi0, sigma[2], params_simul.psi0)),
+    real(dot(params_simul.psi0, sigma[3], params_simul.psi0))]
 sol_lindblad = get_lindbladsol(delta, tspan, u0)
 
-H = 0.5 * BackAction.sigma_x * OMEGA + 0.5 * BackAction.sigma_z * delta
-Ls = reshape(sqrt(GAMMA) * BackAction.sigma_m, NLEVELS, NLEVELS, 1)
-sys = System(H, Ls, NLEVELS, nchannels)
+H = 0.5 * sigma[1] * OMEGA + 0.5 * sigma[3] * delta
+Ls = reshape(sqrt(GAMMA) * BackAction.Utilities.sigma_m, NLEVELS, NLEVELS, 1)
+sys = BackAction.BackActionCoreStructs.System(H, Ls, NLEVELS, nchannels)
 
-sim = get_sol_jumps(sys, params_simul, tspan, sigma, tlist)
+@time sim = get_sol_jumps(sys, params_simul, tspan, sigma, tlist)
 
 ########################## AVERAGE ##########################
 teval = LinRange(tspan[1], tspan[end], ntimes)
@@ -138,9 +138,9 @@ tolerance_individualtrajectory_tracedistance = 0.01
             difference_x = 0.5 * (r_lindblad[1] - r_mean[1, k])
             difference_y = 0.5 * (r_lindblad[2] - r_mean[2, k])
             difference_z = 0.5 * (r_lindblad[3] - r_mean[3, k])
-            difference = difference_x * BackAction.sigma_x +
-                         difference_y * BackAction.sigma_y +
-                         difference_z * BackAction.sigma_y
+            difference = difference_x * sigma[1] +
+                         difference_y * sigma[2] +
+                         difference_z * sigma[3]
             @test abs(0.5 * tr(sqrt(adjoint(difference) * difference))) < tolerance_individualtrajectory_tracedistance
         end
     end
