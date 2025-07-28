@@ -3,12 +3,10 @@ module BackAction
 module SharedDependencies
 using Reexport
 @reexport using LinearAlgebra
-@reexport using Statistics
 @reexport using Random
 end
-
-using Distributed
-include("structs.jl")
+# using Distributed
+include("CoreStructs/CoreStructs.jl")
 include("Gillipsie/Gillipsie.jl")
 include("MonteCarloWaveFunction/MonteCarloWaveFunction.jl")
 include("Utilities/Utilities.jl")

@@ -1,5 +1,5 @@
 module Gillipsie
-using ..BackActionCoreStructs
+using ..CoreStructs
 using ProgressMeter
 using Base.Threads
 import StatsBase

@@ -36,8 +36,8 @@ const tf = 2 * pi / OMEGA * 7
 const tspan = (0.0, tf)
 const ntimes = 100
 const tlist = collect(LinRange(0.0, tf, ntimes))
-const ntraj = 5000
-const params_simul = BackAction.BackActionCoreStructs.SimulParameters([0.0 + 0im, 1.0],
+const ntraj = 1000
+const params_simul = BackAction.CoreStructs.SimulParameters([0.0 + 0im, 1.0],
     tf, # Final time. Set very long so that all trajectories jump
     1, # seed
     ntraj,
@@ -77,7 +77,7 @@ sol_lindblad = get_lindbladsol(delta, tspan, u0)
 
 H = 0.5 * sigma[1] * OMEGA + 0.5 * sigma[3] * delta
 Ls = reshape(sqrt(GAMMA) * BackAction.Utilities.sigma_m, NLEVELS, NLEVELS, 1)
-sys = BackAction.BackActionCoreStructs.System(H, Ls, NLEVELS, nchannels)
+sys = BackAction.CoreStructs.System(H, Ls, NLEVELS, nchannels)
 
 @time sim = get_sol_jumps(sys, params_simul, tspan, sigma, tlist)
 

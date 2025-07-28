@@ -22,30 +22,10 @@ Create a callback to perform jump updates in the MCW method, appropiate for the 
 the type of the `weights` and `cumsum`.
 """
 function _create_callback(sys::System, params::SimulParameters, tspan::Tuple{T1,T1}, rng::Xoshiro,
-    e_ops::Vector{Matrix{T2}}, tlist::Vector{T1};
-    extra_callbacks) where {T1<:Real,T2<:Complex}
-    ttype = eltype(tspan)
-    Random.seed!(rng, params.seed)
-    _jump_affect! = _LindbladJump(
-        getfield(sys, :Ls),
-        getfield(sys, :LLs),
-        getfield(sys, :Heff),
-        rng,
-        Ref{Float64}(rand(rng)),
-        Vector{ttype}(undef, sys.NCHANNELS),
-        Vector{ttype}(undef, sys.NCHANNELS),
-        similar(getfield(params, :psi0)),
-        Vector{Float64}(undef, JUMP_TIMES_INIT_SIZE),
-        Vector{Int64}(undef, JUMP_TIMES_INIT_SIZE),
-        Ref{Int64}(1)
-    )
-    cb1 = ContinuousCallback(JumpCondition(_jump_affect!.r[]), _jump_affect!; save_positions=(true, true))
-
-    expvals = Array{ComplexF64}(undef, length(e_ops), length(tlist))
-    save_func = SaveFuncMCWF(e_ops, Ref(1), expvals)
-    cb2 = FunctionCallingCallback(save_func, funcat=tlist)
-    cblist = (cb1, cb2, extra_callbacks...)
-    return CallbackSet(cblist...)
+    e_ops::Vector{Matrix{T2}}, tlist::Vector{T1}) where {T1<:Real,T2<:Complex}
+    jumpcb = _create_jumpcallback(sys, params, tspan, rng)
+    savecb = _create_savecallback(e_ops, tlist)
+    return CallbackSet(jumpcb, savecb)
 end
 
 #
@@ -61,11 +41,11 @@ solver should save the solution.
 """
 function _generate_trajectoryproblem_jumps(sys::System, params::SimulParameters,
     tspan::Tuple{T2,T2}, e_ops::Vector{Matrix{T1}}, tlist::Vector{T2};
-    extra_callbacks, kwargs...)::ODEProblem where {T1<:Complex,T2<:Real}
+    kwargs...)::ODEProblem where {T1<:Complex,T2<:Real}
     f! = HeffEvolution(getfield(sys, :Heff))
     # # create the LindbladJump that will hold the affect!
     rng = Random.Xoshiro()
-    cb = _create_callback(sys, params, tspan, rng, e_ops, tlist; extra_callbacks)
+    cb = _create_callback(sys, params, tspan, rng, e_ops, tlist)
 
     # return ODEProblem{true}(f!, params.psi0, tspan; callback=cb, saveat=t_eval, kwargs...)
     return ODEProblem{true}(f!, params.psi0, tspan; callback=cb, kwargs...)
@@ -81,12 +61,6 @@ end
 # used in the initialization of an ensemble problem, see: https://docs.sciml.ai/DiffEqDocs/stable/features/ensemble/
 # """
 function _prob_func(prob, i, repeat, tlist)
-    # First, initialize a new RNG with the corresponding seed
-    # rng = Random.Xoshiro()
-    # Random.seed!(rng, i)
-    # affect0! = prob.kwargs[:callback].affect!
-    # _jump_affect! = _similar_affect!(affect0!, rng)
-    # cb = ContinuousCallback(JumpCondition(_jump_affect!.r), _jump_affect!)
     cb_jumps = _initialize_similarcb(i, prob.kwargs[:callback].continuous_callbacks[1].affect!)
     cb_save = _initialize_similarcb(prob.kwargs[:callback].discrete_callbacks[1].affect!.func, tlist)
     f = deepcopy(prob.f.f)
@@ -105,8 +79,8 @@ according to `params`.
 """
 
 function _get_ensemble_problem_jumps(sys, params, tspan,
-    e_ops, tlist; extra_callbacks, kwargs...)
-    prob_sys = _generate_trajectoryproblem_jumps(sys, params, tspan, e_ops, tlist; extra_callbacks, kwargs...)
+    e_ops, tlist; kwargs...)
+    prob_sys = _generate_trajectoryproblem_jumps(sys, params, tspan, e_ops, tlist; kwargs...)
     return EnsembleProblem(prob_sys; prob_func=((prob, i, repeat) -> _prob_func(prob, i, repeat, tlist)),
         output_func=_output_func, safetycopy=false)
 end
@@ -134,9 +108,9 @@ algorithm for the solver via `alg` and `ensemblealg`, and  even pass any valid
 function get_sol_jumps(sys::System, params::SimulParameters, tspan::Tuple{T,T},
     e_ops::Vector{Matrix{T2}}, tlist::Vector{T},
     alg=Tsit5(), ensemblealg=EnsembleDistributed();
-    extra_callbacks=(), kwargs...) where {T<:Real,T2<:Complex}
+    kwargs...) where {T<:Real,T2<:Complex}
     # set the ensemble problem
-    ensemble_prob = _get_ensemble_problem_jumps(sys, params, tspan, e_ops, tlist; extra_callbacks, kwargs...)
+    ensemble_prob = _get_ensemble_problem_jumps(sys, params, tspan, e_ops, tlist; kwargs...)
     return solve(ensemble_prob, alg, ensemblealg, trajectories=params.ntraj)
 end
 

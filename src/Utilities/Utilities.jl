@@ -1,5 +1,5 @@
 module Utilities
-using ..BackActionCoreStructs: System, SimulParameters
+using ..CoreStructs: System, SimulParameters
 using ..SharedDependencies
 include("pauli_m.jl")
 include("rd_ex.jl")
