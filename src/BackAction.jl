@@ -9,6 +9,7 @@ end
 include("CoreStructs/CoreStructs.jl")
 include("Gillipsie/Gillipsie.jl")
 include("MonteCarloWaveFunction/MonteCarloWaveFunction.jl")
+include("MonitoringOperator/MonitoringOperator.jl")
 include("Utilities/Utilities.jl")
 #
 # module MonitoringOperator

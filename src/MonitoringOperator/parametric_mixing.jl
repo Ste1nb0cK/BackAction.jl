@@ -1,4 +1,7 @@
 ### Functions for passing from one unraveling to the next one
+
+
+
 function isometric_mixing_i(Ls::Vector{TJ}, Ti::Vector{T1}, nlevels::T3) where {T1<:Complex,TJ<:Function,T3<:Int}
     f = let Ls = Ls, Ti = Ti, nlevels = nlevels
         (x...) -> begin
@@ -86,4 +89,28 @@ function add_cfield_hamiltonian_correctionterm(H::TH, Ls::Vector{TJ}, alpha::Vec
     return f
 end
 
+function evaluate_and_fill_Ls!(Ls::Vector{TJ}, theta::T2,
+    Ls_store::Array{T1}, nchannels::T3) where {T1<:Complex,T2<:Real,T3<:Int,TJ<:Function}
+    for k in nchannels
+        Ls_store[:, :, k] .= Ls[k](theta)
+    end
+end
 
+function evaluate_and_fill_Ls_dLs(Ls::Vector{TJ}, theta::T2,
+    Ls_store::Array{T1}, dLs_store::Array{T1}, nchannels::T3) where {T1<:Complex,T2<:Real,T3<:Int,TJ<:Function}
+
+    for k in 1:nchannels
+        Ls_store[:, :, k] .= Ls[k](theta)
+        ForwardDiff.derivative!(view(dLs_store, :, :, k), Ls[k], theta)
+    end
+end
+
+
+function obtain_parametric_unraveling_operators(L0::F1, H0::F2, T::Matrix{T1}, alpha::Vector{T1}, nlevels::T3) where {T1<:Complex,T3<:Int,F1<:Function,F2<:Function}
+    # First do the unitary mixing 
+    Ls_mixed = isometric_mixing([L0], T, nlevels, size(T)[1])
+    H = add_cfield_hamiltonian_correctionterm(H0, Ls_mixed, alpha, nlevels)
+    Ls_mixed_cfield = add_cfields(Ls_mixed, alpha, nlevels)
+    He = get_Heff(H, Ls_mixed_cfield, nlevels)
+    return Ls_mixed_cfield, H, He
+end
