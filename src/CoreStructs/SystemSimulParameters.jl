@@ -4,24 +4,26 @@ export System, SimulParameters, DetectionClick, Trajectory
 """
 
     System(
-    NLEVELS::Int64, NCHANNELS::Int64, H::Matrix{ComplexF64}
-    Ls::Vector{Matrix{ComplexF64}}, J::Matrix{ComplexF64},
-    Heff::Matrix{ComplexF64})
+    NLEVELS::T3, NCHANNELS::T3, H::Matrix{T1}
+    Ls::Array{T1,3}, J::Matrix{T1},
+    Heff::Matrix{T1}) where T1<:Complex,T3<:Int
 
 A `struct` that characterizes the dynamics via specification of
  the jump and hamiltonian operators.
 
 # Fields
-- `NLEVELS::Int64`: Number of levels of the system
-- `NCHANNELS::Int64`: Number of jump channels
-- `H::Matrix{ComplexF64}`: Hamiltonian
-- `Ls::Vector{Matrix{ComplexF64}}`: List of jump operators
-- `J::Matrix{ComplexF64}`: Sum of all the ``L_k^{*}L_k``
-- `Heff::Matrix{ComplexF64}`: Effective Hamiltonian
+- `NLEVELS::T3`: Number of levels of the system
+- `NCHANNELS::T3`: Number of jump channels
+- `H::Matrix{T1}`: Hamiltonian
+- `Ls::Array{T1,3}`: List of jump operators
+- `LLs::Array{T1,3}`: List of the products ``L_k^{*}L_k`` of the jump operators
+- `J::Matrix{T1}`: Sum of all the ``L_k^{*}L_k``
+- `Heff::Matrix{T1}`: Effective Hamiltonian
 
-# Constructor
-To create an instance it's enough to provide the hamiltonian and the jump operators in a vector.
-`System(H::Matrix{ComplexF64}, Ls::Vector{Matrix{ComplexF64}})`
+# Constructors
+To create an instance it's enough to provide the hamiltonian, and the jump operators in an array where 
+`Ls[:, :, i]` is the i-th jump operator.
+`System(H::Matrix{T1}, Ls::Array{T1,3} where T1<:Complex`
 
 """
 struct System{T1<:Complex,T3<:Int}
@@ -33,15 +35,7 @@ struct System{T1<:Complex,T3<:Int}
     J::Matrix{T1} # Sum of Jump operators
     Heff::Matrix{T1} # Effective Hamiltonian
 
-    @doc "
-         Inner Constructor of `System` struct.
-         # Arguments:
-         `H::Matrix{ComplexF64}`
-         `Ls::Vector{Matrix{ComplexF64}}`
-"
     function System(H::Matrix{T1}, Ls::Array{T1}, nlevels::T3, nchannels::T3) where {T1<:Complex,T3<:Int}
-        # NLEVELS = size(H, 1)
-        # NCHANNELS = size(Ls, 3) # Number of jump channels
         J = zeros(T1, nlevels, nlevels)
         tmp = zeros(T1, nlevels, nlevels)
         LLs = zeros(T1, nlevels, nlevels, nchannels)
@@ -52,10 +46,9 @@ struct System{T1<:Complex,T3<:Int}
         end
         new{T1,T3}(nlevels, nchannels, H, Ls, LLs, J, H - 0.5im * J)
     end
-    "
-        Constructor that allows specifying the alphas and the T's.
-        The dimension of T must be Nxk, where k=lenght(Ls) but N might be arbitrary.
-        It is expected for T to be unitary
+    "   Construct a 'System' struct with specified cfields and isometric mixing. 
+        The constructor first performs the isometric mixing of the provided jump
+        operators according to 'T' and then adds the cfields from 'alphas'. 
     "
     function System(H::Matrix{T1}, Ls::Array{T1},
         T::Matrix{T1}, alphas::Vector{T1}) where {T1<:Complex}
@@ -109,8 +102,8 @@ DetectionClick(time::T1, label::T2){T1<:Real, T2<:Int}
 label of the channel in which it occured.
 
 # Fields
-- `time::Float64`: Waiting time
-- `label::Int64`: Label of the channel of the click
+- `time::T2`: Waiting time
+- `label::T3`: Label of the channel of the click
  """
 struct DetectionClick{T2<:Real,T3<:Int}
     time::T2
@@ -132,14 +125,15 @@ A `struct` containing all the necessary information for running the
 the simulation.
 
 # Fields
-- `psi0::Array{ComplexF64}`: Initial state, mixed or pure.
-- `nsamples::Int64`: Number of samples in the finegrid
-- `seed::Int64`: seed
-- `ntraj::Int64`: Number of trajectories
-- `multiplier::Float64`: Multiplier to use in the fine grid
-- `tf::Float64`: Final time
-- `dt::Float64`: time step for the finegrid
-- `eps::Float64`: Tolerance for passing WTD normalziation
+- `psi0::Array{T1}`: Initial state, mixed or pure.
+- `nsamples::T3`: Number of samples in the finegrid
+- `seed::T3`: seed
+- `ntraj::T3`: Number of trajectories
+- `multiplier::T2`: Multiplier to use in the fine grid
+- `tf::T2`: Final time
+- `dt::T2`: time step for the finegrid
+- `eps::T2`: Tolerance for passing WTD normalziation
+where `T1<:Complex, T2<:Real, T3<:Int`
 
 # Constructor
 To create an instance it's enough to provide initial state, final time, seed and
@@ -161,10 +155,10 @@ struct SimulParameters{T1<:Complex,T2<:Real,T3<:Int}
     tf::T2 # Final time
     dt::T2 # time step for the finegrid
     eps::T2 # Tolerance for passing WTD normalziation
-    @doc "Inner constructor of `SimulParameters` SimulParameters(psi0::Vector{ComplexF64}, tf::Float64,
-        s::Int64, ntraj::Int64, nsamples::Int64=10000, m::Float64=10.0,
-                             eps::Float64=1e-3)"
-    function SimulParameters(psi0::Union{Vector{T1},Matrix{T1}}, tf::T2,
+    @doc "Inner constructor of `SimulParameters` SimulParameters(psi0::Vector{T1}, tf::T2,
+        s::T3, ntraj::T3, nsamples::T3=10000, m::T2=10.0,
+                             eps::T2=1e-3)"
+    function SimulParameters(psi0::Vector{T1}, tf::T2,
         s::T3, ntraj::T3, nsamples::T3=10000, m::T2=10.0,
         eps::T2=1e-3) where {T1<:Complex,T2<:Real,T3<:Int}
         deltat = m * tf / nsamples

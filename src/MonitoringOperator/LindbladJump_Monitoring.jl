@@ -1,18 +1,17 @@
 
 struct _LindbladJump_Monitoring{T1<:Complex,
-    T2<:Real, #type of the effective hamiltonian
-    # RNGType<:Xoshiro, # type of the RNG
-    # T3<:Ref{Float64}, # type of the random vector one uses to sample
-    T4<:Int # channel labels vector
-    # JCT<:Ref{Int64}, # jump counter
+    T2<:Real,
+    T4<:Int,
+    F<:Function
 }
-    dtheta::T2 #Parameter
+    theta0::T2 #Parameter
     Ls::Array{T1,3}# Jump operators
     dLs::Array{T1,3} # Derivatives of the jump operators
     LLs::Array{T1,3} # Products of the jump operators
     Heff::Matrix{T1} # Effective Hamiltonian
-    Heff_forward::Matrix{T1}
-    Heff_backward::Matrix{T1}
+    Heff_par::F
+    # Heff_forward::Matrix{T1}
+    # Heff_backward::Matrix{T1}
     rng::Xoshiro # Random number generator
     r::Ref{T2} # Random number for sampling, this is inteded to be a Ref
     # Next stuff is for convenience in doing the jump update, here we basically preallocate memory for it
@@ -43,13 +42,14 @@ function _similar_affect!(affect::_LindbladJump_Monitoring, rng)
     cache_aux2 = similar(affect.cache_aux1)
     cache_state = copy(affect.cache_state)
     cache_phi = zero(affect.cache_phi)#similar(affect.cache_phi)
-    return _LindbladJump_Monitoring(affect.dtheta,
+    return _LindbladJump_Monitoring(affect.theta0,
         affect.Ls,
         affect.dLs,
         affect.LLs,
         affect.Heff,
-        affect.Heff_forward,
-        affect.Heff_backward,
+        affect.Heff_par,
+        # affect.Heff_forward,
+        # affect.Heff_backward,
         rng,
         r,
         weights,
@@ -66,13 +66,14 @@ end
 function (f::_LindbladJump_Monitoring)(integrator)
     # _lindblad_jump_monitoring_affect!(integrator, f.theta, f.Ls, f.dLs, f.LLs, f.Heff, f.He_par, f.rng, f.r, f.weights,
     # f.cumsum, f.cache_state, f.cache_phi, f.jump_times, f.jump_channels, f.jump_counter)
-    _lindblad_jump_monitoring_affect!(integrator, f.dtheta, f.Ls, f.dLs, f.LLs, f.Heff, f.Heff_forward,
-        f.Heff_backward, f.rng, f.r, f.weights,
+    _lindblad_jump_monitoring_affect!(integrator, f.theta0, f.Ls, f.dLs, f.LLs, f.Heff, f.Heff_par,
+        f.rng, f.r, f.weights,
         f.cumsum, f.cache_state, f.cache_phi, f.cache_aux1, f.cache_aux2, f.cache_jtime, f.cache_channel)
 
 end
 
-function _lindblad_jump_monitoring_affect!(integrator, dtheta, Ls, dLs, LLs, Heff, Heff_forward, Heff_backward, rng, r, weights, cumsum, cache_state, cache_phi, cache_aux1, cache_aux2, cache_jtime, cache_channel)
+function _lindblad_jump_monitoring_affect!(integrator, theta0, Ls, dLs, LLs, Heff, Heff_par, rng, r, weights,
+    cumsum, cache_state, cache_phi, cache_aux1, cache_aux2, cache_jtime, cache_channel)
     # Obtain the channel jump
     ψ = integrator.u # This is exp(-i\tau H_e)\psi_n
     @inbounds for i in eachindex(weights)
@@ -84,21 +85,12 @@ function _lindblad_jump_monitoring_affect!(integrator, dtheta, Ls, dLs, LLs, Hef
 
     ####### PHI UPDATE without rescaling
     auxt = -1im * (integrator.t - cache_jtime[])
-    central_exp = exp(auxt * Heff)
-    # Obtain  \partial_\theta exp(-i\tau*H_eff(\theta))*\psi , store in aux1
-    mul!(cache_aux1, exp(auxt * Heff_forward), cache_state)
-    mul!(cache_aux2, exp(auxt * Heff_backward), cache_state)
-    cache_aux1 .-= cache_aux2
-    cache_aux1 .*= 1 / dtheta
-    # Obtain \partial_\theta exp(-i\tau*H_eff(\theta))*\psi + exp(-i\tau*H_eff(theta))*\phi, store where the derivative was
-    mul!(cache_aux1, central_exp, cache_phi, 1.0, 1.0)
-    # Multiply by the jump operator and store in phi_cache
-    mul!(cache_phi, view(Ls, :, :, 1), cache_aux1)
-    # Prepare the last term
+    cache_aux1 .= ForwardDiff.derivative(theta -> expv(auxt, Heff_par(theta), cache_state), theta0) +
+                  expv(auxt, Heff, cache_phi)
+    mul!(cache_phi, view(Ls, :, :, cache_channel), cache_aux1)
     mul!(cache_aux2, view(dLs, :, :, cache_channel), ψ)
-    # Now put everything together and store in cache_phi
-    # 
     cache_phi .+= cache_aux2
+
     ###### STATE UPDATE without normalization
     mul!(cache_state, view(Ls, :, :, cache_channel), ψ)
     ##### NORMALIZATION

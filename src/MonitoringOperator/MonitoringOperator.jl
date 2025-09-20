@@ -3,6 +3,7 @@ module MonitoringOperator
 using ..CoreStructs
 using ..SharedDependencies
 using ForwardDiff
+using ExponentialAction
 using DifferentialEquations
 # using Random
 # using LinearAlgebra
