@@ -1,6 +1,8 @@
 ### Functions for passing from one unraveling to the next one
-
-struct ParametricUnravelingJumpOperator{F<:Function,T1<:Complex,T2<:Real} <: Function
+#TODO: Add isometric mixing
+#
+#
+struct ParametricUnravelingJumpOperator{F<:Function,T1<:Complex} <: Function
     L0::F
     cfield::T1
 end
@@ -50,12 +52,8 @@ function evaluate_and_fill_Ls_dLs(Ls::Vector{TJ}, theta::T2,
     end
 end
 
-
-function obtain_parametric_unraveling_operators(L0::F1, H0::F2, T::Matrix{T1}, alpha::Vector{T1}, nlevels::T3) where {T1<:Complex,T3<:Int,F1<:Function,F2<:Function}
-    # First do the unitary mixing 
-    Ls_mixed = isometric_mixing([L0], T, nlevels, size(T)[1])
-    H = add_cfield_hamiltonian_correctionterm(H0, Ls_mixed, alpha, nlevels)
-    Ls_mixed_cfield = add_cfields(Ls_mixed, alpha, nlevels)
-    He = get_Heff(H, Ls_mixed_cfield, nlevels)
-    return Ls_mixed_cfield, H, He
+function obtain_parametric_unraveling_operators(L0s::Union{Vector{Function},Vector{FL}}, H0::F, alpha::Vector{T1}) where {T1<:Complex,F<:Function,FL<:Function}
+    Ls_par = [ParametricUnravelingJumpOperator(L0s[k], alpha[k]) for k in eachindex(alpha)]
+    H_par = ParametricUnravelingHamiltonian(H0, Ls_par)
+    return Ls_par, H_par, ParametricUnravelingEffectiveHamiltonian(H_par)
 end
