@@ -1,7 +1,7 @@
 export get_sol_jumps_monitoring, evaluate_and_fill_Ls!, evaluate_and_fill_Ls_dLs
-function _create_callbacks_monitoring(theta0, dLs, Heff_par, sys, params, tspan, rng, e_ops, tlist)
+function _create_callbacks_monitoring(theta0, dLs, Heff_par, sys, params, tspan, rng, tlist)
     jumpcb = _create_jumpcallback_monitoring(theta0, dLs, Heff_par, sys, params, tspan, rng)
-    savecb = _create_savecallback_monitoring(e_ops, tlist)
+    savecb = _create_savecallback_monitoring(tlist, sys.NLEVELS)
     return CallbackSet(jumpcb, savecb)
 end
 
@@ -12,9 +12,6 @@ function _prob_func_monitoring(prob, i, repeat, tlist)
 
     return remake(prob; f=f, callback=CallbackSet(cb_jumps, cb_save))
 end
-
-
-
 
 """
 ```
@@ -28,14 +25,14 @@ solver should save the solution.
 """
 function _generate_trajectoryproblem_jumps_monitoring(theta0::T2, dLs::Array{T1}, Heff_par::F,
     sys::System, params::SimulParameters,
-    tspan::Tuple{T2,T2}, e_ops, tlist; kwargs...)::ODEProblem where {T1<:Complex,T2<:Real,F<:Function}
+    tspan::Tuple{T2,T2}, tlist; kwargs...)::ODEProblem where {T1<:Complex,T2<:Real,F<:Function}
     # function f!(du::Vector{ComplexF64}, u::Vector{ComplexF64}, p, t)::Vector{ComplexF64}
     #     du .= -1im * sys.Heff * u
     # end
     f! = HeffEvolution(getfield(sys, :Heff))
     # # create the LindbladJump that will hold the affect!
     rng = Random.Xoshiro()
-    cb = _create_callbacks_monitoring(theta0, dLs, Heff_par, sys, params, tspan, rng, e_ops, tlist)
+    cb = _create_callbacks_monitoring(theta0, dLs, Heff_par, sys, params, tspan, rng, tlist)
     # return ODEProblem{true}(f!, params.psi0, tspan; callback=cb, saveat=t_eval, kwargs...)
     return ODEProblem{true}(f!, params.psi0, tspan; callback=cb, kwargs...)
 end
@@ -56,10 +53,6 @@ function _output_func_monitoring(sol, i)
     return (sol, false)
 end
 
-
-
-
-
 """
 ```
 _get_ensemble_problem_jumps(sys, params, t_eval; kwargs...)
@@ -68,8 +61,8 @@ Initialize an ensemble ODEProblem from the given `System`. The initial
 state for all the trajectories is assumed to be the same, and the seed is set
 according to `params`.
 """
-function _get_ensemble_problem_jumps_monitoring(theta0, dLs, Heff_par, sys, params, tspan, e_ops, tlist; kwargs...)
-    prob_sys = _generate_trajectoryproblem_jumps_monitoring(theta0, dLs, Heff_par, sys, params, tspan, e_ops, tlist; kwargs...)
+function _get_ensemble_problem_jumps_monitoring(theta0, dLs, Heff_par, sys, params, tspan, tlist; kwargs...)
+    prob_sys = _generate_trajectoryproblem_jumps_monitoring(theta0, dLs, Heff_par, sys, params, tspan, tlist; kwargs...)
     return EnsembleProblem(prob_sys; prob_func=((prob, i, repeat) -> _prob_func_monitoring(prob, i, repeat, tlist)),
         output_func=_output_func_monitoring, safetycopy=false)
 end
@@ -87,11 +80,11 @@ algorithm for the solver via `alg` and `ensemblealg`, and  even pass any valid
 """
 function get_sol_jumps_monitoring(theta0::T2, dLs::Array{T1}, Heff_par::F,
     sys::System, params::SimulParameters,
-    tspan::Tuple{T2,T2}, e_ops, tlist; alg=Tsit5(),
+    tspan::Tuple{T2,T2}, tlist; alg=Tsit5(),
     ensemblealg=EnsembleDistributed(), kwargs...) where {T1<:Complex,T2<:Real,F<:Function}
     # set the ensemble problem
     ensemble_prob = _get_ensemble_problem_jumps_monitoring(theta0, dLs, Heff_par,
-        sys, params, tspan, e_ops, tlist; kwargs...)
+        sys, params, tspan, tlist; kwargs...)
     return solve(ensemble_prob, alg, ensemblealg, trajectories=params.ntraj)
 end
 

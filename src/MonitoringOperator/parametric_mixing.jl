@@ -1,6 +1,39 @@
 ### Functions for passing from one unraveling to the next one
 
+struct ParametricUnravelingJumpOperator{F<:Function,T1<:Complex,T2<:Real} <: Function
+    L0::F
+    phase::T2
+    cfield::T1
+end
 
+function (f::ParametricUnravelingJumpOperator)(theta...)
+    return exp(1.0im * f.phase) * f.L0(theta...) + f.cfield * I
+end
+
+struct ParametricUnravelingHamiltonian{PJO<:ParametricUnravelingJumpOperator,F<:Function} <: Function
+    H0_par::F
+    Ls_par::Vector{PJO}
+end
+
+function adjointdifference(L::PJO, theta...) where {PJO<:ParametricUnravelingJumpOperator}
+    return conj(L.cfield) * exp(1.0im * L.phase) * L.L0(theta...) - L.cfield * exp(-1.0im * L.phase) * adjoint(L.L0(theta...))
+end
+
+function productwithadjoint(L::PJO, theta...) where {PJO<:ParametricUnravelingJumpOperator}
+    return adjoint(L(theta...)) * L(theta...)
+end
+
+function (f::ParametricUnravelingHamiltonian)(theta...)
+    return f.H0_par(theta...) - 0.5im * sum(L -> adjointdifference(L, theta...), f.Ls_par)
+end
+
+struct ParametricUnravelingEffectiveHamiltonian{PH<:ParametricUnravelingHamiltonian} <: Function
+    H_par::PH
+end
+
+function (f::ParametricUnravelingEffectiveHamiltonian)(theta...)
+    return f.H_par(theta...) - 0.5im * sum(L -> productwithadjoint(L, theta...), f.H_par.Ls_par)
+end
 
 function isometric_mixing_i(Ls::Vector{TJ}, Ti::Vector{T1}, nlevels::T3) where {T1<:Complex,TJ<:Function,T3<:Int}
     f = let Ls = Ls, Ti = Ti, nlevels = nlevels
